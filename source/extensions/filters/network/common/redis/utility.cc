@@ -31,6 +31,30 @@ AuthRequest::AuthRequest(const std::string& username, const std::string& passwor
   asArray().swap(values);
 }
 
+HelloRequest::HelloRequest() {
+  std::vector<RespValue> values(2);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = "hello";
+  values[1].type(RespType::BulkString);
+  values[1].asString() = "3";
+  type(RespType::Array);
+  asArray().swap(values);
+}
+
+ClientTrackingRequest::ClientTrackingRequest() {
+  std::vector<RespValue> values(3);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = "client";
+  values[1].type(RespType::BulkString);
+  values[1].asString() = "tracking";
+  values[2].type(RespType::BulkString);
+  values[2].asString() = "on";
+  values[3].type(RespType::BulkString);
+  values[3].asString() = "bcast";
+  type(RespType::Array);
+  asArray().swap(values);
+}
+
 RespValuePtr makeError(const std::string& error) {
   Common::Redis::RespValuePtr response(new RespValue());
   response->type(Common::Redis::RespType::Error);

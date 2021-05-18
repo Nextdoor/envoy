@@ -212,6 +212,32 @@ public:
                            const std::string& auth_password) PURE;
 };
 
+class CacheCallbacks {
+public:
+  virtual ~CacheCallbacks() = default;
+  virtual void onCacheResponse(RespValuePtr&& value) PURE;
+};
+
+
+class Cache {
+public:
+  virtual ~Cache() = default;
+
+  virtual void makeCacheRequest(const RespValue& request) PURE;
+  //virtual void set(const std::string &key, RespValuePtr&& value) PURE;
+  virtual void set(const std::string &key, const std::string& value) PURE;
+  virtual void expire(const std::string &key) PURE;
+  virtual void addCallbacks(CacheCallbacks& callbacks) PURE;
+};
+
+using CachePtr = std::unique_ptr<Cache>;
+
+class CacheFactory {
+public:
+  virtual ~CacheFactory() = default;
+  virtual CachePtr create(ClientPtr&& client) PURE; //  ClientFactory& client_factory
+};
+
 } // namespace Client
 } // namespace Redis
 } // namespace Common

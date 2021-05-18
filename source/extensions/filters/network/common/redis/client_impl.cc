@@ -57,9 +57,10 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const Config& config,
                              const RedisCommandStatsSharedPtr& redis_command_stats,
-                             Stats::Scope& scope) {
+                             Stats::Scope& scope,
+                             CachePtr&& cache) {
   auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory,
-                                             config, redis_command_stats, scope);
+                                             config, redis_command_stats, scope, std::move(cache));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -70,13 +71,14 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config,
-                       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope)
+                       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+                       CachePtr&& cache)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
-      scope_(scope) {
+      scope_(scope), cache_(std::move(cache)) {
   host->cluster().stats().upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
   host->cluster().stats().upstream_cx_active_.inc();
@@ -101,6 +103,7 @@ void ClientImpl::flushBufferAndResetTimer() {
 }
 
 PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& callbacks) {
+  ENVOY_LOG(info, this->host_->address()->asString());
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
   const bool empty_buffer = encoder_buffer_.length() == 0;
@@ -115,8 +118,17 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     command = redis_command_stats_->getUnusedStatName();
   }
 
-  pending_requests_.emplace_back(*this, callbacks, command);
-  encoder_->encode(request, encoder_buffer_);
+  PendingRequestPtr prp{new PendingRequest(*this, callbacks, command, request)};
+  bool cache_request = false;
+  if (cache_ && request.type() == RespType::Array && request.asArray()[0].asString() == "get") {
+    // Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
+    pending_cache_requests_.push_back(std::move(prp));
+    cache_->makeCacheRequest(request);
+    cache_request = true;
+  } else {
+    pending_requests_.push_back(std::move(prp));
+    encoder_->encode(request, encoder_buffer_);
+  }
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
   if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
@@ -135,7 +147,12 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-  return &pending_requests_.back();
+
+  if (cache_request) {
+    return pending_cache_requests_.back().get();
+  } else {
+    return pending_requests_.back().get();
+  }
 }
 
 void ClientImpl::onConnectOrOpTimeout() {
@@ -169,6 +186,7 @@ void ClientImpl::putOutlierEvent(Upstream::Outlier::Result result) {
 }
 
 void ClientImpl::onEvent(Network::ConnectionEvent event) {
+  ENVOY_LOG(info, this->host_->address()->asString());
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
 
@@ -181,9 +199,9 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
     }
 
     while (!pending_requests_.empty()) {
-      PendingRequest& request = pending_requests_.front();
-      if (!request.canceled_) {
-        request.callbacks_.onFailure();
+      PendingRequestPtr& request = pending_requests_.front();
+      if (!request->canceled_) {
+        request->callbacks_.onFailure();
       } else {
         host_->cluster().stats().upstream_rq_cancelled_.inc();
       }
@@ -203,23 +221,88 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   }
 }
 
+void ClientImpl::onCacheResponse(RespValuePtr&& value) {
+  ASSERT(!pending_cache_requests_.empty());
+
+  PendingRequestPtr pending_request = std::move(pending_cache_requests_.front());
+  pending_cache_requests_.pop_front();
+
+  // On cache miss make request to redis.
+  if (value == nullptr || value->type() == RespType::Null || value->type() == RespType::Error) {
+    ENVOY_LOG(info, "onCacheResponse: cache miss");
+    const bool empty_buffer = encoder_buffer_.length() == 0;
+
+    RespValue request_val = pending_request->request_;
+    pending_requests_.push_back(std::move(pending_request));
+
+    encoder_->encode(request_val, encoder_buffer_);
+
+    // If buffer is full, flush. If the buffer was empty before the request, start the timer.
+    if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
+      flushBufferAndResetTimer();
+    } else if (empty_buffer) {
+      flush_timer_->enableTimer(std::chrono::milliseconds(config_.bufferFlushTimeoutInMs()));
+    }
+
+    // Only boost the op timeout if:
+    // - We are not already connected. Otherwise, we are governed by the connect timeout and the timer
+    //   will be reset when/if connection occurs. This allows a relatively long connection spin up
+    //   time for example if TLS is being used.
+    // - This is the first request on the pipeline. Otherwise the timeout would effectively start on
+    //   the last operation.
+    if (connected_ && pending_requests_.size() == 1) {
+      connect_or_op_timer_->enableTimer(config_.opTimeout());
+    }
+
+    return;
+  }
+
+  ENVOY_LOG(info, "onCacheResponse: cache hit");
+  if (pending_request->canceled_) {
+    host_->cluster().stats().upstream_rq_cancelled_.inc();
+  } else {
+    ClientCallbacks& callbacks = pending_request->callbacks_;
+    callbacks.onResponse(std::move(value));
+  }
+
+  // If there are no remaining ops in the pipeline we need to disable the timer.
+  // Otherwise we boost the timer since we are receiving responses and there are more to flush
+  // out.
+  if (pending_requests_.empty()) {
+    connect_or_op_timer_->disableTimer();
+  } else {
+    connect_or_op_timer_->enableTimer(config_.opTimeout());
+  }
+
+  putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
+}
+
 void ClientImpl::onRespValue(RespValuePtr&& value) {
+  ENVOY_LOG(info, this->host_->address()->asString());
+  if (cache_ && value->type() == Common::Redis::RespType::Push && PushResponse::get().INVALIDATE == value->asArray()[0].asString()) {
+    ENVOY_LOG(trace, "recieved invalidate");
+    // TODO(slava): loop over second array?
+    cache_->expire(value->asArray()[1].asArray()[0].asString());
+    return;
+  }
+
   ASSERT(!pending_requests_.empty());
-  PendingRequest& request = pending_requests_.front();
-  const bool canceled = request.canceled_;
+  PendingRequestPtr request = std::move(pending_requests_.front());
+  const bool canceled = request->canceled_;
 
   if (config_.enableCommandStats()) {
     bool success = !canceled && (value->type() != Common::Redis::RespType::Error);
-    redis_command_stats_->updateStats(scope_, request.command_, success);
-    request.command_request_timer_->complete();
+    redis_command_stats_->updateStats(scope_, request->command_, success);
+    request->command_request_timer_->complete();
   }
-  request.aggregate_request_timer_->complete();
+  request->aggregate_request_timer_->complete();
 
-  ClientCallbacks& callbacks = request.callbacks_;
+  ClientCallbacks& callbacks = request->callbacks_;
 
   // We need to ensure the request is popped before calling the callback, since the callback might
   // result in closing the connection.
   pending_requests_.pop_front();
+  
   if (canceled) {
     host_->cluster().stats().upstream_rq_cancelled_.inc();
   } else if (config_.enableRedirection() && (value->type() == Common::Redis::RespType::Error)) {
@@ -247,6 +330,12 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
       }
     }
   } else {
+    // If request is a get then fire and forget cache set request
+    if (cache_ && request->request_.type() == RespType::Array && request->request_.asArray()[0].asString() == "get" &&
+          (value->type() == RespType::SimpleString || value->type() == RespType::BulkString)) {
+      cache_->set(request->request_.asArray()[1].asString(), value->asString());
+    }
+
     callbacks.onResponse(std::move(value));
   }
 
@@ -263,10 +352,10 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks,
-                                           Stats::StatName command)
+                                           Stats::StatName command, const RespValue& request)
     : parent_(parent), callbacks_(callbacks), command_{command},
       aggregate_request_timer_(parent_.redis_command_stats_->createAggregateTimer(
-          parent_.scope_, parent_.time_source_)) {
+          parent_.scope_, parent_.time_source_)), request_(request) {
   if (parent_.config_.enableCommandStats()) {
     command_request_timer_ = parent_.redis_command_stats_->createCommandTimer(
         parent_.scope_, command_, parent_.time_source_);
@@ -299,6 +388,18 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
     Utility::AuthRequest auth_request(auth_password);
     makeRequest(auth_request, null_pool_callbacks);
   }
+
+  // Send a HELLO command to set client server protocol version.
+  Utility::HelloRequest hello_request;
+  makeRequest(hello_request, null_pool_callbacks);
+
+  // Turn on client tracking
+  if (cache_) {
+    cache_->addCallbacks(*this);
+    Utility::ClientTrackingRequest client_tracking_request;
+    makeRequest(client_tracking_request, null_pool_callbacks);
+  }
+
   // Any connection to replica requires the READONLY command in order to perform read.
   // Also the READONLY command is a no-opt for the primary.
   // We only need to send the READONLY command iff it's possible that the host is a replica.
@@ -314,8 +415,28 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
                                     const std::string& auth_password) {
+
+
+  auto &&cc = host->cluster();
+  Upstream::HostSharedPtr cache_host;
+  Upstream::ClusterInfoConstSharedPtr ptr(&cc);
+  Network::Address::InstanceConstSharedPtr address_ptr;
+  address_ptr = std::make_shared<Network::Address::Ipv4Instance>("192.168.65.2", 5555);
+
+  //cluster_info = std::make_shared<Upstream::ClusterInfoImpl>();
+
+  Upstream::HostSharedPtr new_host{new Upstream::HostImpl(ptr
+      , "", address_ptr, nullptr, 1, envoy::config::core::v3::Locality(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN, dispatcher.timeSource())};
+
+  ClientPtr cache_client = ClientImpl::create(new_host, dispatcher, EncoderPtr{new EncoderImpl()},
+                                        decoder_factory_, config, redis_command_stats, scope, nullptr);
+  cache_client->initialize(auth_username, auth_password);
+  CachePtr cp = cache_factory_.create(std::move(cache_client));
   ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
-                                        decoder_factory_, config, redis_command_stats, scope);
+                                        decoder_factory_, config, redis_command_stats, scope, std::move(cp)); // 
+
   client->initialize(auth_username, auth_password);
   return client;
 }

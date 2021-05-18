@@ -22,7 +22,7 @@ namespace Redis {
  * element is a SimpleString or BulkString and the rest of the elements are portion of another
  * Array. This is created for performance.
  */
-enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array, CompositeArray };
+enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array, CompositeArray, Map, Push };
 
 /**
  * A variant implementation of a RESP value optimized for performance. A C++11 union is used for

@@ -12,6 +12,7 @@
 #include "source/common/common/utility.h"
 
 #include "absl/container/fixed_array.h"
+#include "extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,6 +22,8 @@ namespace Redis {
 
 std::string RespValue::toString() const {
   switch (type_) {
+  case RespType::Push:
+  case RespType::Map:
   case RespType::Array: {
     std::string ret = "[";
     for (uint64_t i = 0; i < asArray().size(); i++) {
@@ -56,12 +59,14 @@ std::string RespValue::toString() const {
 }
 
 std::vector<RespValue>& RespValue::asArray() {
-  ASSERT(type_ == RespType::Array);
+  ASSERT(type_ == RespType::Array || type_ == RespType::Map ||
+         type_ == RespType::Push);
   return array_;
 }
 
 const std::vector<RespValue>& RespValue::asArray() const {
-  ASSERT(type_ == RespType::Array);
+  ASSERT(type_ == RespType::Array || type_ == RespType::Map ||
+         type_ == RespType::Push);
   return array_;
 }
 
@@ -100,6 +105,8 @@ const RespValue::CompositeArray& RespValue::asCompositeArray() const {
 void RespValue::cleanup() {
   // Need to manually delete because of the union.
   switch (type_) {
+  case RespType::Push:
+  case RespType::Map:
   case RespType::Array: {
     array_.~vector<RespValue>();
     break;
@@ -127,6 +134,8 @@ void RespValue::type(RespType type) {
   // Need to use placement new because of the union.
   type_ = type;
   switch (type) {
+  case RespType::Push:
+  case RespType::Map:
   case RespType::Array: {
     new (&array_) std::vector<RespValue>();
     break;
@@ -151,6 +160,8 @@ void RespValue::type(RespType type) {
 RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
   type(other.type());
   switch (type_) {
+  case RespType::Push:
+  case RespType::Map:
   case RespType::Array: {
     asArray() = other.asArray();
     break;
@@ -176,6 +187,8 @@ RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
 
 RespValue::RespValue(RespValue&& other) noexcept : type_(other.type_) {
   switch (type_) {
+  case RespType::Push:
+  case RespType::Map:
   case RespType::Array: {
     new (&array_) std::vector<RespValue>(std::move(other.array_));
     break;
@@ -205,6 +218,8 @@ RespValue& RespValue::operator=(const RespValue& other) {
   }
   type(other.type());
   switch (type_) {
+  case RespType::Push:
+  case RespType::Map:
   case RespType::Array: {
     asArray() = other.asArray();
     break;
@@ -236,6 +251,8 @@ RespValue& RespValue::operator=(RespValue&& other) noexcept {
 
   type(other.type());
   switch (type_) {
+  case RespType::Push:
+  case RespType::Map:
   case RespType::Array: {
     array_ = std::move(other.array_);
     break;
@@ -267,6 +284,8 @@ bool RespValue::operator==(const RespValue& other) const {
   }
 
   switch (type_) {
+  case RespType::Push:
+  case RespType::Map:
   case RespType::Array: {
     result = (asArray() == other.asArray());
     break;
@@ -361,6 +380,21 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         pending_value_stack_.front().value_->type(RespType::Array);
         break;
       }
+      case '%': {
+        state_ = State::IntegerStart;
+        pending_value_stack_.front().value_->type(RespType::Map);
+        break;
+      }
+      case '>': {
+        state_ = State::IntegerStart;
+        pending_value_stack_.front().value_->type(RespType::Push);
+        break;
+      }
+      case '_': {
+        state_ = State::IntegerStart;
+        pending_value_stack_.front().value_->type(RespType::Null);
+        break;
+      }
       case '$': {
         state_ = State::IntegerStart;
         pending_value_stack_.front().value_->type(RespType::BulkString);
@@ -431,7 +465,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       buffer++;
 
       PendingValue& current_value = pending_value_stack_.front();
-      if (current_value.value_->type() == RespType::Array) {
+      if (current_value.value_->type() == RespType::Array || current_value.value_->type() == RespType::Map || current_value.value_->type() == RespType::Push) {
         if (pending_integer_.negative_) {
           // Null array. Convert to null.
           current_value.value_->type(RespType::Null);
@@ -439,12 +473,17 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         } else if (pending_integer_.integer_ == 0) {
           state_ = State::ValueComplete;
         } else {
+          // Multiply by 2 when type is a Map
+          if (current_value.value_->type() == RespType::Map) {
+            pending_integer_.integer_ = pending_integer_.integer_ * 2;
+          }
           std::vector<RespValue> values(pending_integer_.integer_);
           current_value.value_->asArray().swap(values);
           pending_value_stack_.push_front({&current_value.value_->asArray()[0], 0});
           state_ = State::ValueStart;
         }
-      } else if (current_value.value_->type() == RespType::Integer) {
+      }
+       else if (current_value.value_->type() == RespType::Integer) {
         if (pending_integer_.integer_ == 0 || !pending_integer_.negative_) {
           current_value.value_->asInteger() = pending_integer_.integer_;
         } else {
@@ -455,7 +494,11 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
               static_cast<int64_t>(pending_integer_.integer_ - 1) * -1 - 1;
         }
         state_ = State::ValueComplete;
-      } else {
+      } else if(current_value.value_->type() == RespType::Null) {
+        current_value.value_->type(RespType::Null);
+        state_ = State::ValueComplete;
+      }
+      else {
         ASSERT(current_value.value_->type() == RespType::BulkString);
         if (!pending_integer_.negative_) {
           // TODO(mattklein123): reserve and define max length since we don't stream currently.
@@ -534,7 +577,8 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         state_ = State::ValueRootStart;
       } else {
         PendingValue& current_value = pending_value_stack_.front();
-        ASSERT(current_value.value_->type() == RespType::Array);
+
+
         if (current_value.current_array_element_ < current_value.value_->asArray().size() - 1) {
           current_value.current_array_element_++;
           pending_value_stack_.push_front(
@@ -551,6 +595,9 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
 
 void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
   switch (value.type()) {
+  // TODO(slava): encode differently when encoding into resp2 vs resp3
+  case RespType::Push:
+  case RespType::Map:
   case RespType::Array: {
     encodeArray(value.asArray(), out);
     break;
@@ -572,7 +619,9 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
     break;
   }
   case RespType::Null: {
-    out.add("$-1\r\n", 5);
+    // TODO(slava): handle nulls different in resp2 vs resp3
+    //out.add("$-1\r\n", 5);
+    out.add("_\r\n",3);
     break;
   }
   case RespType::Integer:
@@ -605,6 +654,20 @@ void EncoderImpl::encodeCompositeArray(const RespValue::CompositeArray& composit
   *current++ = '\n';
   out.add(buffer, current - buffer);
   for (const RespValue& value : composite_array) {
+    encode(value, out);
+  }
+}
+
+void EncoderImpl::encodeMap(const std::vector<RespValue>& array, Buffer::Instance& out) {
+  char buffer[32];
+  char* current = buffer;
+  *current++ = '%';
+  current += StringUtil::itoa(current, 21, array.size());
+  *current++ = '\r';
+  *current++ = '\n';
+  out.add(buffer, current - buffer);
+
+  for (const RespValue& value : array) {
     encode(value, out);
   }
 }

@@ -60,6 +60,7 @@ envoy_cc_library(
     deps = [
         ":client_interface",
         ":codec_lib",
+        ":cache_lib",
         ":utility_lib",
         "//envoy/router:router_interface",
         "//envoy/stats:timespan_interface",
@@ -71,6 +72,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_lib",
+        "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -120,5 +122,17 @@ envoy_cc_library(
         "//envoy/upstream:upstream_interface",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "cache_lib",
+    srcs = ["cache_impl.cc"],
+    hdrs = ["cache_impl.h"],
+    deps = [
+        ":codec_lib",
+        ":utility_interface",
+        ":client_interface",
+        "//source/common/common:utility_lib",
     ],
 )

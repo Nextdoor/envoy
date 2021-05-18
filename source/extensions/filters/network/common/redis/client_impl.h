@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <string>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/timespan.h"
@@ -15,6 +16,7 @@
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/filters/network/common/redis/client.h"
+#include "source/extensions/filters/network/common/redis/cache_impl.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 
 namespace Envoy {
@@ -34,6 +36,12 @@ struct RedirectionValues {
 };
 
 using RedirectionResponse = ConstSingleton<RedirectionValues>;
+
+struct PushValues {
+  const std::string INVALIDATE = "invalidate";
+};
+
+using PushResponse = ConstSingleton<PushValues>;
 
 class ConfigImpl : public Config {
 public:
@@ -66,17 +74,18 @@ private:
   ReadPolicy read_policy_;
 };
 
-class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
+class ClientImpl : public Client, public DecoderCallbacks, public CacheCallbacks, public Network::ConnectionCallbacks, public Logger::Loggable<Logger::Id::redis> {
 public:
   static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                           const Config& config,
                           const RedisCommandStatsSharedPtr& redis_command_stats,
-                          Stats::Scope& scope);
+                          Stats::Scope& scope,
+                          CachePtr&& cache);
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const Config& config,
-             const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope);
+             const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope, CachePtr&& cache);
   ~ClientImpl() override;
 
   // Client
@@ -105,7 +114,7 @@ private:
   };
 
   struct PendingRequest : public PoolRequest {
-    PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks, Stats::StatName stat_name);
+    PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks, Stats::StatName stat_name, const RespValue& request);
     ~PendingRequest() override;
 
     // PoolRequest
@@ -117,7 +126,10 @@ private:
     bool canceled_{};
     Stats::TimespanPtr aggregate_request_timer_;
     Stats::TimespanPtr command_request_timer_;
+    const RespValue& request_;
   };
+
+  using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
@@ -125,6 +137,9 @@ private:
 
   // DecoderCallbacks
   void onRespValue(RespValuePtr&& value) override;
+
+  // CacheCallbacks
+  void onCacheResponse(RespValuePtr&& value) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -137,13 +152,15 @@ private:
   Buffer::OwnedImpl encoder_buffer_;
   DecoderPtr decoder_;
   const Config& config_;
-  std::list<PendingRequest> pending_requests_;
+  std::list<PendingRequestPtr> pending_requests_;
+  std::list<PendingRequestPtr> pending_cache_requests_;
   Event::TimerPtr connect_or_op_timer_;
   bool connected_{};
   Event::TimerPtr flush_timer_;
   Envoy::TimeSource& time_source_;
   const RedisCommandStatsSharedPtr redis_command_stats_;
   Stats::Scope& scope_;
+  CachePtr cache_;
 };
 
 class ClientFactoryImpl : public ClientFactory {
@@ -158,6 +175,7 @@ public:
 
 private:
   DecoderFactoryImpl decoder_factory_;
+  CacheFactoryImpl cache_factory_;
 };
 
 } // namespace Client

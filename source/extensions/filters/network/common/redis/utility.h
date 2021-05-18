@@ -17,6 +17,16 @@ public:
   AuthRequest(const std::string& password);
 };
 
+class HelloRequest : public Redis::RespValue {
+public:
+  HelloRequest();
+};
+
+class ClientTrackingRequest : public Redis::RespValue {
+public:
+  ClientTrackingRequest();
+};
+
 RespValuePtr makeError(const std::string& error);
 
 class ReadOnlyRequest : public Redis::RespValue {
