@@ -1,10 +1,6 @@
 #include "extensions/filters/network/common/redis/cache_impl.h"
 
-#include <algorithm>
 #include <cstddef>
-#include <iostream>
-#include <memory>
-#include <type_traits>
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec.h"
 #include "extensions/filters/network/common/redis/utility.h"
@@ -37,16 +33,27 @@ void CacheImpl::set(const std::string &key, const std::string& value) {
 }
 
 void CacheImpl::expire(const std::string &key) {
-    cache_store_.erase(key);
+    RespValuePtr request(new RespValue());
+    std::vector<RespValue> values(2);
+    values[0].type(RespType::BulkString);
+    values[0].asString() = "del";
+    values[1].type(RespType::BulkString);
+    values[1].asString() = key;
+
+    request->type(RespType::Array);
+    request->asArray().swap(values);
+
+    client_->makeRequest(*request, *this);
 }
 
 // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
 void CacheImpl::onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) {
     // Handle Cache set or delete responses
-    if (value->type() == RespType::SimpleString && value->asString() == "OK") {
+    // TODO(slava): refactor this to use request tracking
+    if ((value->type() == RespType::SimpleString && value->asString() == "OK") || value->type() == RespType::Integer) {
         return;
     }
-    
+
     if (value->type() != RespType::Error) {
         callbacks_.front()->onCacheResponse(std::move(value));
     } else {
