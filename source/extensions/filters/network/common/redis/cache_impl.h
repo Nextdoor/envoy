@@ -1,7 +1,5 @@
 #pragma once
 
-#include <unordered_map>
-
 #include "common/common/logger.h"
 
 #include "extensions/filters/network/common/redis/codec.h"
@@ -13,10 +11,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Common {
 namespace Redis {
-
-// clang-format off
-using CacheStore = std::unordered_map<std::string, RespValuePtr>;
-// clang-format on
 
 class CacheImpl : public Client::Cache, public Logger::Loggable<Logger::Id::redis>, public Client::ClientCallbacks {
 public:
@@ -38,7 +32,6 @@ public:
   }
 
 private:
-  CacheStore cache_store_;
   Client::ClientPtr client_;
   std::list<Client::CacheCallbacks*> callbacks_;
 };
