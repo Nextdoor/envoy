@@ -13,6 +13,7 @@ namespace Common {
 namespace Redis {
 
 void CacheImpl::makeCacheRequest(const RespValue& request) {
+    pending_requests_.emplace_back(Operation::Get);
     client_->makeRequest(request, *this);
 }
 
@@ -29,6 +30,8 @@ void CacheImpl::set(const std::string &key, const std::string& value) {
     request->type(RespType::Array);
     request->asArray().swap(values);
 
+    pending_requests_.emplace_back(Operation::Set);
+
     client_->makeRequest(*request, *this);
 }
 
@@ -43,27 +46,49 @@ void CacheImpl::expire(const std::string &key) {
     request->type(RespType::Array);
     request->asArray().swap(values);
 
+    pending_requests_.emplace_back(Operation::Expire);
+
     client_->makeRequest(*request, *this);
 }
 
 // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
 void CacheImpl::onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) {
-    // Handle Cache set or delete responses
-    // TODO(slava): refactor this to use request tracking
-    if ((value->type() == RespType::SimpleString && value->asString() == "OK") || value->type() == RespType::Integer) {
-        return;
-    }
+    ASSERT(!pending_requests_.empty());
 
-    if (value->type() != RespType::Error) {
-        callbacks_.front()->onCacheResponse(std::move(value));
-    } else {
-        callbacks_.front()->onCacheResponse(nullptr);
+    PendingCacheRequest& req = pending_requests_.front();
+    pending_requests_.pop_front();
+
+    switch (req.op_) {
+    case Operation::Set:
+    case Operation::Expire:
+    break;
+    case Operation::Get:
+        if (value->type() == RespType::Error || value->type() == RespType::Null) {
+            callbacks_.front()->onCacheResponse(nullptr);
+        } else {
+            callbacks_.front()->onCacheResponse(std::move(value));
+        }
+    break;
     }
 }
 
 void CacheImpl::onFailure() {
-    // TODO(slava): implement
+    ASSERT(!pending_requests_.empty());
+
+    PendingCacheRequest& req = pending_requests_.front();
+    pending_requests_.pop_front();
+
+    switch (req.op_) {
+    case Operation::Set:
+    case Operation::Expire:
+    break;
+    case Operation::Get:
+        callbacks_.front()->onCacheResponse(nullptr);
+    break;
+    }
 }
+
+CacheImpl::PendingCacheRequest::PendingCacheRequest(const Operation op) : op_(op) {}
 
 } // namespace Redis
 } // namespace Common

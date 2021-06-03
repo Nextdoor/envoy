@@ -134,16 +134,14 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   }
 
   PendingRequestPtr prp{new PendingRequest(*this, callbacks, command, request)};
-  bool cache_request = false;
   if (cache_ && request.type() == RespType::Array && request.asArray()[0].asString() == "get") {
-    // Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
     pending_cache_requests_.push_back(std::move(prp));
     cache_->makeCacheRequest(request);
-    cache_request = true;
-  } else {
-    pending_requests_.push_back(std::move(prp));
-    encoder_->encode(request, encoder_buffer_);
+    return pending_cache_requests_.back().get();
   }
+
+  pending_requests_.push_back(std::move(prp));
+  encoder_->encode(request, encoder_buffer_);
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
   if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
@@ -162,12 +160,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     connect_or_op_timer_->enableTimer(config_.opTimeout());
   }
 
-
-  if (cache_request) {
-    return pending_cache_requests_.back().get();
-  } else {
-    return pending_requests_.back().get();
-  }
+  return pending_requests_.back().get();
 }
 
 void ClientImpl::onConnectOrOpTimeout() {
@@ -241,15 +234,47 @@ void ClientImpl::onCacheResponse(RespValuePtr&& value) {
 
   PendingRequestPtr pending_request = std::move(pending_cache_requests_.front());
   pending_cache_requests_.pop_front();
+  const bool canceled = pending_request->canceled_;
 
-  // On cache miss make request to redis.
-  if (value == nullptr || value->type() == RespType::Null || value->type() == RespType::Error) {
+  if (canceled) {
+    host_->cluster().stats().upstream_rq_cancelled_.inc();
+  }
+
+  // Cache hit
+  if (value != nullptr) {
+    ENVOY_LOG(info, "onCacheResponse: cache hit");
+    if (config_.enableCommandStats()) {
+      bool success = !canceled && (value->type() != Common::Redis::RespType::Error);
+      redis_command_stats_->updateStats(scope_, pending_request->command_, success);
+      pending_request->command_request_timer_->complete();
+    }
+    pending_request->aggregate_request_timer_->complete();
+
+    if (!canceled) {
+      ClientCallbacks& callbacks = pending_request->callbacks_;
+      callbacks.onResponse(std::move(value));
+    }
+
+    // If there are no remaining ops in the pipeline we need to disable the timer.
+    // Otherwise we boost the timer since we are receiving responses and there are more to flush
+    // out.
+    if (pending_requests_.empty()) {
+      connect_or_op_timer_->disableTimer();
+    } else {
+      connect_or_op_timer_->enableTimer(config_.opTimeout());
+    }
+
+    putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
+  } else {
     ENVOY_LOG(info, "onCacheResponse: cache miss");
     const bool empty_buffer = encoder_buffer_.length() == 0;
 
+    if (canceled) {
+      return;
+    }
+
     RespValue request_val = pending_request->request_;
     pending_requests_.push_back(std::move(pending_request));
-
     encoder_->encode(request_val, encoder_buffer_);
 
     // If buffer is full, flush. If the buffer was empty before the request, start the timer.
@@ -268,28 +293,7 @@ void ClientImpl::onCacheResponse(RespValuePtr&& value) {
     if (connected_ && pending_requests_.size() == 1) {
       connect_or_op_timer_->enableTimer(config_.opTimeout());
     }
-
-    return;
   }
-
-  ENVOY_LOG(info, "onCacheResponse: cache hit");
-  if (pending_request->canceled_) {
-    host_->cluster().stats().upstream_rq_cancelled_.inc();
-  } else {
-    ClientCallbacks& callbacks = pending_request->callbacks_;
-    callbacks.onResponse(std::move(value));
-  }
-
-  // If there are no remaining ops in the pipeline we need to disable the timer.
-  // Otherwise we boost the timer since we are receiving responses and there are more to flush
-  // out.
-  if (pending_requests_.empty()) {
-    connect_or_op_timer_->disableTimer();
-  } else {
-    connect_or_op_timer_->enableTimer(config_.opTimeout());
-  }
-
-  putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
 }
 
 void ClientImpl::onRespValue(RespValuePtr&& value) {
