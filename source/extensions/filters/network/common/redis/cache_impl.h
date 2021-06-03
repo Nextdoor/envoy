@@ -12,6 +12,12 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
+enum class Operation {
+  Get,
+  Set,
+  Expire
+};
+
 class CacheImpl : public Client::Cache, public Logger::Loggable<Logger::Id::redis>, public Client::ClientCallbacks {
 public:
   CacheImpl(Client::ClientPtr&& client) : client_(std::move(client)) {}
@@ -32,8 +38,19 @@ public:
   }
 
 private:
+  struct PendingCacheRequest : public Client::PoolRequest {
+    PendingCacheRequest(const Operation op);
+    ~PendingCacheRequest() override = default;
+
+    // PoolRequest
+    void cancel() override {};
+
+    const Operation op_;
+  };
+
   Client::ClientPtr client_;
   std::list<Client::CacheCallbacks*> callbacks_;
+  std::list<PendingCacheRequest> pending_requests_;
 };
 
 class CacheFactoryImpl : public Client::CacheFactory {
