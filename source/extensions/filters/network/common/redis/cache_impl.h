@@ -21,8 +21,8 @@ enum class Operation {
 class CacheImpl : public Client::Cache, public Logger::Loggable<Logger::Id::redis>, public Client::ClientCallbacks {
 public:
   CacheImpl(Client::ClientPtr&& client) : client_(std::move(client)) {}
+  ~CacheImpl() override;
   void makeCacheRequest(const RespValue& request) override;
-  //void set(const std::string &key, RespValuePtr&& value) override;
   void set(const std::string &key, const std::string& value) override;
   void expire(const std::string &key) override;
   void addCallbacks(Client::CacheCallbacks& callbacks) override {

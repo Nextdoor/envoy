@@ -209,7 +209,8 @@ public:
                            const Config& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
                            Stats::Scope& scope, const std::string& auth_username,
-                           const std::string& auth_password) PURE;
+                           const std::string& auth_password,
+                           Upstream::HostConstSharedPtr cache_host) PURE;
 };
 
 class CacheCallbacks {
@@ -219,12 +220,11 @@ public:
 };
 
 
-class Cache {
+class Cache : public Event::DeferredDeletable {
 public:
-  virtual ~Cache() = default;
+  ~Cache() override = default;
 
   virtual void makeCacheRequest(const RespValue& request) PURE;
-  //virtual void set(const std::string &key, RespValuePtr&& value) PURE;
   virtual void set(const std::string &key, const std::string& value) PURE;
   virtual void expire(const std::string &key) PURE;
   virtual void addCallbacks(CacheCallbacks& callbacks) PURE;

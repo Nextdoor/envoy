@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
@@ -233,9 +234,24 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
   if (!client) {
     client = std::make_unique<ThreadLocalActiveClient>(*this);
     client->host_ = host;
+
+    // Ensure the filter is not deleted in the main thread during this method.
+    auto shared_parent = parent_.lock();
+    if (!shared_parent) {
+      throw EnvoyException("Filter was deleted in the main thread");
+    }
+
+    // TODO(slava): make this configurable
+    Upstream::HostConstSharedPtr cache_host = nullptr;
+    auto cache_cluster = shared_parent->cm_.getThreadLocalCluster("redis_cache_cluster");
+    if (cache_cluster != nullptr) {
+      cache_host = cache_cluster->loadBalancer().chooseHost(nullptr);
+      ASSERT(cache_host != nullptr);
+    }
+
     client->redis_client_ =
         client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
-                               auth_username_, auth_password_);
+                               auth_username_, auth_password_, cache_host);
     client->redis_client_->addConnectionCallbacks(*client);
   }
   return client;
