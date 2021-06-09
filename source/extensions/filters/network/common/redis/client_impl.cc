@@ -127,7 +127,6 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   if (config_.enableCommandStats()) {
     // Only lowercase command and get StatName if we enable command stats
     command = redis_command_stats_->getCommandFromRequest(request);
-    redis_command_stats_->updateStatsTotal(scope_, command);
   } else {
     // If disabled, we use a placeholder stat name "unused" that is not used
     command = redis_command_stats_->getUnusedStatName();
@@ -138,6 +137,10 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     pending_cache_requests_.push_back(std::move(prp));
     cache_->makeCacheRequest(request);
     return pending_cache_requests_.back().get();
+  }
+
+  if (config_.enableCommandStats()) {
+    redis_command_stats_->updateStatsTotal(scope_, command);
   }
 
   pending_requests_.push_back(std::move(prp));
@@ -244,8 +247,6 @@ void ClientImpl::onCacheResponse(RespValuePtr&& value) {
   if (value != nullptr) {
     ENVOY_LOG(info, "onCacheResponse: cache hit");
     if (config_.enableCommandStats()) {
-      bool success = !canceled && (value->type() != Common::Redis::RespType::Error);
-      redis_command_stats_->updateStats(scope_, pending_request->command_, success);
       pending_request->command_request_timer_->complete();
     }
     pending_request->aggregate_request_timer_->complete();
@@ -271,6 +272,10 @@ void ClientImpl::onCacheResponse(RespValuePtr&& value) {
 
     if (canceled) {
       return;
+    }
+
+    if (config_.enableCommandStats()) {
+      redis_command_stats_->updateStatsTotal(scope_, pending_request->command_);
     }
 
     RespValue request_val = pending_request->request_;
