@@ -88,6 +88,10 @@ void CacheImpl::onFailure() {
     }
 }
 
+CacheImpl::~CacheImpl() {
+    this->client_->close();
+}
+
 CacheImpl::PendingCacheRequest::PendingCacheRequest(const Operation op) : op_(op) {}
 
 } // namespace Redis
