@@ -429,32 +429,22 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
 
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
-ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
+ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr cache_host,
+                                    Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
                                     const std::string& auth_password) {
+  CachePtr cp = nullptr;
+  if (cache_host != nullptr) {
+    ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl()},
+                                      decoder_factory_, config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
+    cache_client->initialize(auth_username, auth_password);
+    cp = cache_factory_.create(std::move(cache_client));
+  }
 
-
-  auto &&cc = host->cluster();
-  Upstream::HostSharedPtr cache_host;
-  Upstream::ClusterInfoConstSharedPtr ptr(&cc);
-  Network::Address::InstanceConstSharedPtr address_ptr;
-  address_ptr = std::make_shared<Network::Address::Ipv4Instance>("192.168.65.2", 5555);
-
-  //cluster_info = std::make_shared<Upstream::ClusterInfoImpl>();
-
-  Upstream::HostSharedPtr new_host{new Upstream::HostImpl(ptr
-      , "", address_ptr, nullptr, 1, envoy::config::core::v3::Locality(),
-      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-      envoy::config::core::v3::UNKNOWN, dispatcher.timeSource())};
-
-  ClientPtr cache_client = ClientImpl::create(new_host, dispatcher, EncoderPtr{new EncoderImpl()},
-                                        decoder_factory_, config, redis_command_stats, scope, nullptr);
-  cache_client->initialize(auth_username, auth_password);
-  CachePtr cp = cache_factory_.create(std::move(cache_client));
   ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
-                                        decoder_factory_, config, redis_command_stats, scope, std::move(cp)); // 
+                                        decoder_factory_, config, redis_command_stats, scope, std::move(cp));
 
   client->initialize(auth_username, auth_password);
   return client;

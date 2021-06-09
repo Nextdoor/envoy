@@ -205,7 +205,8 @@ public:
    * @param auth password for upstream host.
    * @return ClientPtr a new connection pool client.
    */
-  virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+  virtual ClientPtr create(Upstream::HostConstSharedPtr cache_host,
+                           Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                            const Config& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
                            Stats::Scope& scope, const std::string& auth_username,
