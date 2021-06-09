@@ -434,12 +434,12 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
 
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
-ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr cache_host,
-                                    Upstream::HostConstSharedPtr host,
+ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
-                                    const std::string& auth_password) {
+                                    const std::string& auth_password,
+                                    Upstream::HostConstSharedPtr cache_host) {
   CachePtr cp = nullptr;
   if (cache_host != nullptr) {
     ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl()},
