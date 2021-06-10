@@ -263,6 +263,7 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
   switch (value->type()) {
   case Common::Redis::RespType::Array:
   case Common::Redis::RespType::Map:
+  case Common::Redis::RespType::Set:
   case Common::Redis::RespType::Push:
   case Common::Redis::RespType::Integer:
   case Common::Redis::RespType::SimpleString:
