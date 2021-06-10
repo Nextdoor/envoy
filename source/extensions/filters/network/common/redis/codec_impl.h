@@ -80,6 +80,8 @@ public:
  */
 class EncoderImpl : public Encoder {
 public:
+  EncoderImpl(const RespVersion version) : version_(version) {}
+
   // RedisProxy::Encoder
   void encode(const RespValue& value, Buffer::Instance& out) override;
 
@@ -87,10 +89,13 @@ private:
   void encodeArray(const std::vector<RespValue>& array, Buffer::Instance& out);
   void encodeCompositeArray(const RespValue::CompositeArray& array, Buffer::Instance& out);
   void encodeMap(const std::vector<RespValue>& array, Buffer::Instance& out);
+  void encodeSet(const std::vector<RespValue>& array, Buffer::Instance& out);
   void encodeBulkString(const std::string& string, Buffer::Instance& out);
   void encodeError(const std::string& string, Buffer::Instance& out);
   void encodeInteger(int64_t integer, Buffer::Instance& out);
   void encodeSimpleString(const std::string& string, Buffer::Instance& out);
+
+  RespVersion version_;
 };
 
 } // namespace Redis

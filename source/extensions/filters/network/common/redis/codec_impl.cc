@@ -24,6 +24,7 @@ std::string RespValue::toString() const {
   switch (type_) {
   case RespType::Push:
   case RespType::Map:
+  case RespType::Set:
   case RespType::Array: {
     std::string ret = "[";
     for (uint64_t i = 0; i < asArray().size(); i++) {
@@ -60,13 +61,13 @@ std::string RespValue::toString() const {
 
 std::vector<RespValue>& RespValue::asArray() {
   ASSERT(type_ == RespType::Array || type_ == RespType::Map ||
-         type_ == RespType::Push);
+         type_ == RespType::Set || type_ == RespType::Push);
   return array_;
 }
 
 const std::vector<RespValue>& RespValue::asArray() const {
   ASSERT(type_ == RespType::Array || type_ == RespType::Map ||
-         type_ == RespType::Push);
+         type_ == RespType::Set || type_ == RespType::Push);
   return array_;
 }
 
@@ -107,6 +108,7 @@ void RespValue::cleanup() {
   switch (type_) {
   case RespType::Push:
   case RespType::Map:
+  case RespType::Set:
   case RespType::Array: {
     array_.~vector<RespValue>();
     break;
@@ -136,6 +138,7 @@ void RespValue::type(RespType type) {
   switch (type) {
   case RespType::Push:
   case RespType::Map:
+  case RespType::Set:
   case RespType::Array: {
     new (&array_) std::vector<RespValue>();
     break;
@@ -162,6 +165,7 @@ RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
   switch (type_) {
   case RespType::Push:
   case RespType::Map:
+  case RespType::Set:
   case RespType::Array: {
     asArray() = other.asArray();
     break;
@@ -189,6 +193,7 @@ RespValue::RespValue(RespValue&& other) noexcept : type_(other.type_) {
   switch (type_) {
   case RespType::Push:
   case RespType::Map:
+  case RespType::Set:
   case RespType::Array: {
     new (&array_) std::vector<RespValue>(std::move(other.array_));
     break;
@@ -220,6 +225,7 @@ RespValue& RespValue::operator=(const RespValue& other) {
   switch (type_) {
   case RespType::Push:
   case RespType::Map:
+  case RespType::Set:
   case RespType::Array: {
     asArray() = other.asArray();
     break;
@@ -253,6 +259,7 @@ RespValue& RespValue::operator=(RespValue&& other) noexcept {
   switch (type_) {
   case RespType::Push:
   case RespType::Map:
+  case RespType::Set:
   case RespType::Array: {
     array_ = std::move(other.array_);
     break;
@@ -286,6 +293,7 @@ bool RespValue::operator==(const RespValue& other) const {
   switch (type_) {
   case RespType::Push:
   case RespType::Map:
+  case RespType::Set:
   case RespType::Array: {
     result = (asArray() == other.asArray());
     break;
@@ -385,6 +393,11 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         pending_value_stack_.front().value_->type(RespType::Map);
         break;
       }
+      case '~': {
+        state_ = State::IntegerStart;
+        pending_value_stack_.front().value_->type(RespType::Set);
+        break;
+      }
       case '>': {
         state_ = State::IntegerStart;
         pending_value_stack_.front().value_->type(RespType::Push);
@@ -465,7 +478,9 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       buffer++;
 
       PendingValue& current_value = pending_value_stack_.front();
-      if (current_value.value_->type() == RespType::Array || current_value.value_->type() == RespType::Map || current_value.value_->type() == RespType::Push) {
+      auto cur_type = current_value.value_->type();
+      if (cur_type == RespType::Array || cur_type == RespType::Map ||
+          cur_type == RespType::Set || cur_type == RespType::Push) {
         if (pending_integer_.negative_) {
           // Null array. Convert to null.
           current_value.value_->type(RespType::Null);
@@ -474,7 +489,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
           state_ = State::ValueComplete;
         } else {
           // Multiply by 2 when type is a Map
-          if (current_value.value_->type() == RespType::Map) {
+          if (cur_type == RespType::Map) {
             pending_integer_.integer_ = pending_integer_.integer_ * 2;
           }
           std::vector<RespValue> values(pending_integer_.integer_);
@@ -483,7 +498,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
           state_ = State::ValueStart;
         }
       }
-       else if (current_value.value_->type() == RespType::Integer) {
+       else if (cur_type == RespType::Integer) {
         if (pending_integer_.integer_ == 0 || !pending_integer_.negative_) {
           current_value.value_->asInteger() = pending_integer_.integer_;
         } else {
@@ -494,12 +509,12 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
               static_cast<int64_t>(pending_integer_.integer_ - 1) * -1 - 1;
         }
         state_ = State::ValueComplete;
-      } else if(current_value.value_->type() == RespType::Null) {
+      } else if(cur_type == RespType::Null) {
         current_value.value_->type(RespType::Null);
         state_ = State::ValueComplete;
       }
       else {
-        ASSERT(current_value.value_->type() == RespType::BulkString);
+        ASSERT(cur_type == RespType::BulkString);
         if (!pending_integer_.negative_) {
           // TODO(mattklein123): reserve and define max length since we don't stream currently.
           state_ = State::BulkStringBody;
@@ -595,9 +610,23 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
 
 void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
   switch (value.type()) {
-  // TODO(slava): encode differently when encoding into resp2 vs resp3
   case RespType::Push:
+    encodeArray(value.asArray(), out);
+    break;
   case RespType::Map:
+    if (this->version_ == RespVersion::Resp3) {
+      encodeMap(value.asArray(), out);
+    } else {
+      encodeArray(value.asArray(), out);
+    }
+    break;
+  case RespType::Set:
+    if (this->version_ == RespVersion::Resp3) {
+      encodeSet(value.asArray(), out);
+    } else {
+      encodeArray(value.asArray(), out);
+    }
+    break;
   case RespType::Array: {
     encodeArray(value.asArray(), out);
     break;
@@ -619,9 +648,11 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
     break;
   }
   case RespType::Null: {
-    // TODO(slava): handle nulls different in resp2 vs resp3
-    //out.add("$-1\r\n", 5);
-    out.add("_\r\n",3);
+    if (this->version_ == RespVersion::Resp3) {
+      out.add("_\r\n",3);
+    } else {
+      out.add("$-1\r\n", 5);
+    }
     break;
   }
   case RespType::Integer:
@@ -662,6 +693,20 @@ void EncoderImpl::encodeMap(const std::vector<RespValue>& array, Buffer::Instanc
   char buffer[32];
   char* current = buffer;
   *current++ = '%';
+  current += StringUtil::itoa(current, 21, array.size());
+  *current++ = '\r';
+  *current++ = '\n';
+  out.add(buffer, current - buffer);
+
+  for (const RespValue& value : array) {
+    encode(value, out);
+  }
+}
+
+void EncoderImpl::encodeSet(const std::vector<RespValue>& array, Buffer::Instance& out) {
+  char buffer[32];
+  char* current = buffer;
+  *current++ = '~';
   current += StringUtil::itoa(current, 21, array.size());
   *current++ = '\r';
   *current++ = '\n';
