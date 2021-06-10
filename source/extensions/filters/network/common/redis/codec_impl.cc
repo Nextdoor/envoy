@@ -610,10 +610,23 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
 
 void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
   switch (value.type()) {
-  // TODO(slava): encode differently when encoding into resp2 vs resp3
   case RespType::Push:
+    encodeArray(value.asArray(), out);
+    break;
   case RespType::Map:
+    if (this->version_ == RespVersion::Resp3) {
+      encodeMap(value.asArray(), out);
+    } else {
+      encodeArray(value.asArray(), out);
+    }
+    break;
   case RespType::Set:
+    if (this->version_ == RespVersion::Resp3) {
+      encodeSet(value.asArray(), out);
+    } else {
+      encodeArray(value.asArray(), out);
+    }
+    break;
   case RespType::Array: {
     encodeArray(value.asArray(), out);
     break;
@@ -635,9 +648,11 @@ void EncoderImpl::encode(const RespValue& value, Buffer::Instance& out) {
     break;
   }
   case RespType::Null: {
-    // TODO(slava): handle nulls different in resp2 vs resp3
-    //out.add("$-1\r\n", 5);
-    out.add("_\r\n",3);
+    if (this->version_ == RespVersion::Resp3) {
+      out.add("_\r\n",3);
+    } else {
+      out.add("$-1\r\n", 5);
+    }
     break;
   }
   case RespType::Integer:

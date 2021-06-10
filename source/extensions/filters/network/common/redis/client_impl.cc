@@ -442,13 +442,13 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Upstream::HostConstSharedPtr cache_host) {
   CachePtr cp = nullptr;
   if (cache_host != nullptr) {
-    ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl()},
+    ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
                                       decoder_factory_, config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
     cache_client->initialize(auth_username, auth_password);
     cp = cache_factory_.create(std::move(cache_client));
   }
 
-  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
+  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
                                         decoder_factory_, config, redis_command_stats, scope, std::move(cp));
 
   client->initialize(auth_username, auth_password);
