@@ -143,6 +143,7 @@ private:
 
   // CacheCallbacks
   void onCacheResponse(RespValuePtr&& value) override;
+  void onCacheClose() override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
