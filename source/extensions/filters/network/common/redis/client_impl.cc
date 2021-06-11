@@ -302,7 +302,7 @@ void ClientImpl::onCacheResponse(RespValuePtr&& value) {
 }
 
 void ClientImpl::onCacheClose() {
-  // Propogate the close
+  // Propagate the close
   if (this->connected_) {
     this->close();
   }
