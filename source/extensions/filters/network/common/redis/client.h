@@ -217,6 +217,7 @@ class CacheCallbacks {
 public:
   virtual ~CacheCallbacks() = default;
   virtual void onCacheResponse(RespValuePtr&& value) PURE;
+  virtual void onCacheClose() PURE;
 };
 
 

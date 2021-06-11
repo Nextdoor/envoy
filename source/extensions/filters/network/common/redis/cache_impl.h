@@ -18,9 +18,11 @@ enum class Operation {
   Expire
 };
 
-class CacheImpl : public Client::Cache, public Logger::Loggable<Logger::Id::redis>, public Client::ClientCallbacks {
+class CacheImpl : public Client::Cache, public Logger::Loggable<Logger::Id::redis>, public Client::ClientCallbacks, public Network::ConnectionCallbacks {
 public:
-  CacheImpl(Client::ClientPtr&& client) : client_(std::move(client)) {}
+  CacheImpl(Client::ClientPtr&& client) : client_(std::move(client)) {
+    client_->addConnectionCallbacks(*this);
+  }
   ~CacheImpl() override;
   void makeCacheRequest(const RespValue& request) override;
   void set(const std::string &key, const std::string& value) override;
@@ -36,6 +38,11 @@ public:
                       bool) override {
     return true;
   }
+
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
 
 private:
   struct PendingCacheRequest : public Client::PoolRequest {

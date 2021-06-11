@@ -88,6 +88,13 @@ void CacheImpl::onFailure() {
     }
 }
 
+void CacheImpl::onEvent(Network::ConnectionEvent event) {
+    if (event == Network::ConnectionEvent::RemoteClose ||
+        event == Network::ConnectionEvent::LocalClose) {
+        callbacks_.front()->onCacheClose();
+    }
+}
+
 CacheImpl::~CacheImpl() {
     this->client_->close();
 }

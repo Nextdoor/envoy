@@ -286,6 +286,13 @@ void ClientImpl::onCacheResponse(RespValuePtr&& value) {
   }
 }
 
+void ClientImpl::onCacheClose() {
+  // Propagate the close
+  if (this->connected_) {
+    this->close();
+  }
+}
+
 void ClientImpl::onRespValue(RespValuePtr&& value) {
   ENVOY_LOG(info, this->host_->address()->asString());
   if (cache_ && value->type() == Common::Redis::RespType::Push && PushResponse::get().INVALIDATE == value->asArray()[0].asString()) {
