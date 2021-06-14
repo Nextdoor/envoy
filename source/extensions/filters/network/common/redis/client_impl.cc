@@ -207,6 +207,14 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
       }
     }
 
+    while (!pending_cache_requests_.empty()) {
+      PendingRequestPtr& request = pending_cache_requests_.front();
+      if (!request->canceled_) {
+        request->callbacks_.onFailure();
+      }
+      pending_cache_requests_.pop_front();
+    }
+
     while (!pending_requests_.empty()) {
       PendingRequestPtr& request = pending_requests_.front();
       if (!request->canceled_) {

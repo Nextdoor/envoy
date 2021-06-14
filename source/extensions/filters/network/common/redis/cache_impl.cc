@@ -74,18 +74,7 @@ void CacheImpl::onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) 
 
 void CacheImpl::onFailure() {
     ASSERT(!pending_requests_.empty());
-
-    PendingCacheRequest& req = pending_requests_.front();
     pending_requests_.pop_front();
-
-    switch (req.op_) {
-    case Operation::Set:
-    case Operation::Expire:
-    break;
-    case Operation::Get:
-        callbacks_.front()->onCacheResponse(nullptr);
-    break;
-    }
 }
 
 void CacheImpl::onEvent(Network::ConnectionEvent event) {
