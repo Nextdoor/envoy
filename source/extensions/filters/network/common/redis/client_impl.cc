@@ -443,6 +443,21 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
 
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
+envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings createConnPoolSettings(
+    int64_t millis = 20, bool hashtagging = true, bool redirection_support = true,
+    uint32_t max_unknown_conns = 100,
+    envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::ReadPolicy
+        read_policy = envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+            ConnPoolSettings::MASTER) {
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings setting{};
+  setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(millis));
+  setting.set_enable_hashtagging(hashtagging);
+  setting.set_enable_redirection(redirection_support);
+  setting.mutable_max_upstream_unknown_connections()->set_value(max_unknown_conns);
+  setting.set_read_policy(read_policy);
+  return setting;
+}
+
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
@@ -451,8 +466,10 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Upstream::HostConstSharedPtr cache_host) {
   CachePtr cp = nullptr;
   if (cache_host != nullptr) {
+    // TODO(slava): use config from config file
+    auto cache_config = new ConfigImpl(createConnPoolSettings(20, true, false));
     ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
-                                      decoder_factory_, config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
+                                      decoder_factory_, *cache_config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
     cache_client->initialize(auth_username, auth_password);
     cp = cache_factory_.create(std::move(cache_client));
   }
