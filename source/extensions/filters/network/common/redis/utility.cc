@@ -42,7 +42,7 @@ HelloRequest::HelloRequest() {
 }
 
 ClientTrackingRequest::ClientTrackingRequest() {
-  std::vector<RespValue> values(3);
+  std::vector<RespValue> values(4);
   values[0].type(RespType::BulkString);
   values[0].asString() = "client";
   values[1].type(RespType::BulkString);
