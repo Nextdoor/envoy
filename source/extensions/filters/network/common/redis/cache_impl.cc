@@ -19,13 +19,20 @@ void CacheImpl::makeCacheRequest(const RespValue& request) {
 
 void CacheImpl::set(const std::string &key, const std::string& value) {
     RespValuePtr request(new RespValue());
-    std::vector<RespValue> values(3);
+    std::vector<RespValue> values(5);
     values[0].type(RespType::BulkString);
     values[0].asString() = "set";
     values[1].type(RespType::BulkString);
     values[1].asString() = key;
     values[2].type(RespType::BulkString);
     values[2].asString() = value;
+
+    // Set a default TTL to ensure that even if we miss an invalidation
+    // message from the server that the value will auto expire.
+    values[3].type(RespType::BulkString);
+    values[3].asString() = "EX";
+    values[4].type(RespType::BulkString);
+    values[4].asString() = "900";
 
     request->type(RespType::Array);
     request->asArray().swap(values);
