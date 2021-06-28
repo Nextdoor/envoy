@@ -229,6 +229,8 @@ public:
   virtual void set(const std::string &key, const std::string& value) PURE;
   virtual void expire(const std::string &key) PURE;
   virtual void addCallbacks(CacheCallbacks& callbacks) PURE;
+  virtual void clearCache(bool synchronous) PURE;
+  virtual void initialize(const std::string& auth_username, const std::string& auth_password, bool clear_cache) PURE;
 };
 
 using CachePtr = std::unique_ptr<Cache>;
@@ -236,7 +238,7 @@ using CachePtr = std::unique_ptr<Cache>;
 class CacheFactory {
 public:
   virtual ~CacheFactory() = default;
-  virtual CachePtr create(ClientPtr&& client) PURE; //  ClientFactory& client_factory
+  virtual CachePtr create(ClientPtr&& client) PURE;
 };
 
 } // namespace Client
