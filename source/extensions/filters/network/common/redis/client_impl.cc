@@ -312,8 +312,16 @@ void ClientImpl::onCacheClose() {
 
 void ClientImpl::onRespValue(RespValuePtr&& value) {
   if (cache_ && value->type() == Common::Redis::RespType::Push && PushResponse::get().INVALIDATE == value->asArray()[0].asString()) {
-    // TODO(slava): loop over second array?
-    cache_->expire(value->asArray()[1].asArray()[0].asString());
+    ASSERT(value->asArray().size() == 2);
+
+    if (value->asArray()[1].type() == Common::Redis::RespType::BulkString) {
+      cache_->expire(value->asArray()[1].asArray()[0].asString());
+    } else if (value->asArray()[1].type() == Common::Redis::RespType::Null) {
+      // On Null it means the FLUSHALL was run on Redis and entire cache must
+      // be cleared.
+      cache_->clearCache(true);
+    }
+
     return;
   }
 
@@ -333,7 +341,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   // We need to ensure the request is popped before calling the callback, since the callback might
   // result in closing the connection.
   pending_requests_.pop_front();
-  
+
   if (canceled) {
     host_->cluster().stats().upstream_rq_cancelled_.inc();
   } else if (config_.enableRedirection() && (value->type() == Common::Redis::RespType::Error)) {
@@ -468,8 +476,8 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
     auto cache_config = new ConfigImpl(createConnPoolSettings(20, true, false));
     ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
                                       decoder_factory_, *cache_config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
-    cache_client->initialize(auth_username, auth_password);
     cp = cache_factory_.create(std::move(cache_client));
+    cp->initialize(auth_username, auth_password, true);
   }
 
   ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},

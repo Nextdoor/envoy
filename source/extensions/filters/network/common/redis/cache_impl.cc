@@ -58,6 +58,37 @@ void CacheImpl::expire(const std::string &key) {
     client_->makeRequest(*request, *this);
 }
 
+void CacheImpl::clearCache(bool synchronous) {
+    RespValuePtr request(new RespValue());
+    std::vector<RespValue> values(2);
+    values[0].type(RespType::BulkString);
+    values[0].asString() = "FLUSHALL";
+
+    values[1].type(RespType::BulkString);
+    if (synchronous) {
+        values[1].asString() = "SYNC";
+    } else {
+        values[1].asString() = "ASYNC";
+    }
+
+    request->type(RespType::Array);
+    request->asArray().swap(values);
+
+    pending_requests_.emplace_back(Operation::Flush);
+    client_->makeRequest(*request, *this);
+}
+
+void CacheImpl::initialize(const std::string& auth_username, const std::string& auth_password, bool clear_cache) {
+    client_->initialize(auth_username, auth_password);
+
+    // Ensures that if the cache connection was ever lost that on
+    // reconnect cache is flushed as we may have missed invalidation
+    // messages.
+    if (clear_cache) {
+        clearCache(true);
+    }
+}
+
 // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
 void CacheImpl::onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) {
     ASSERT(!pending_requests_.empty());
@@ -68,6 +99,7 @@ void CacheImpl::onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) 
     switch (req.op_) {
     case Operation::Set:
     case Operation::Expire:
+    case Operation::Flush:
     break;
     case Operation::Get:
         if (value->type() == RespType::Error || value->type() == RespType::Null) {

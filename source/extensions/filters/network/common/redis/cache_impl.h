@@ -15,7 +15,8 @@ namespace Redis {
 enum class Operation {
   Get,
   Set,
-  Expire
+  Expire,
+  Flush
 };
 
 class CacheImpl : public Client::Cache, public Logger::Loggable<Logger::Id::redis>, public Client::ClientCallbacks, public Network::ConnectionCallbacks {
@@ -30,6 +31,8 @@ public:
   void addCallbacks(Client::CacheCallbacks& callbacks) override {
     this->callbacks_.push_front(&callbacks);
   }
+  void clearCache(bool synchronous) override;
+  void initialize(const std::string& auth_username, const std::string& auth_password, bool clear_cache) override;
 
   // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
   void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
