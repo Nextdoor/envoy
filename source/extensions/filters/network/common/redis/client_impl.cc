@@ -132,7 +132,9 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   }
 
   PendingRequestPtr prp{new PendingRequest(*this, callbacks, command, request)};
-  if (cache_ && request.type() == RespType::Array && request.asArray()[0].asString() == "get") {
+
+  if (cache_ && request.type() == RespType::Array &&
+        absl::AsciiStrToLower(request.asArray()[0].asString()) == "get") {
     pending_cache_requests_.push_back(std::move(prp));
     cache_->makeCacheRequest(request);
     return pending_cache_requests_.back().get();
@@ -370,8 +372,10 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     }
   } else {
     // If request is a get then fire and forget cache set request
-    if (cache_ && request->request_.type() == RespType::Array && request->request_.asArray()[0].asString() == "get" &&
-          (value->type() == RespType::SimpleString || value->type() == RespType::BulkString)) {
+    if (cache_ &&
+      request->request_.type() == RespType::Array &&
+      absl::AsciiStrToLower(request->request_.asArray()[0].asString()) == "get" &&
+      (value->type() == RespType::SimpleString || value->type() == RespType::BulkString)) {
       cache_->set(request->request_.asArray()[1].asString(), value->asString());
     }
 
