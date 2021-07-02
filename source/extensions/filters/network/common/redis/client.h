@@ -226,7 +226,7 @@ public:
   ~Cache() override = default;
 
   virtual void makeCacheRequest(const RespValue& request) PURE;
-  virtual void set(const std::string &key, const std::string& value) PURE;
+  virtual void set(const RespValue& request, const RespValue& response) PURE;
   virtual void expire(const RespValue& keys) PURE;
   virtual void addCallbacks(CacheCallbacks& callbacks) PURE;
   virtual void clearCache(bool synchronous) PURE;

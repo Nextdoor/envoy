@@ -26,7 +26,7 @@ public:
   }
   ~CacheImpl() override;
   void makeCacheRequest(const RespValue& request) override;
-  void set(const std::string &key, const std::string& value) override;
+  void set(const RespValue& request, const RespValue& response) override;
   void expire(const RespValue& keys) override;
   void addCallbacks(Client::CacheCallbacks& callbacks) override {
     this->callbacks_.push_front(&callbacks);
