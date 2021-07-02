@@ -1,6 +1,7 @@
 #include "extensions/filters/network/common/redis/cache_impl.h"
 
 #include <cstddef>
+#include <string>
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec.h"
 #include "extensions/filters/network/common/redis/utility.h"
@@ -17,15 +18,34 @@ void CacheImpl::makeCacheRequest(const RespValue& request) {
     client_->makeRequest(request, *this);
 }
 
-void CacheImpl::set(const std::string &key, const std::string& value) {
-    RespValuePtr request(new RespValue());
+void CacheImpl::set(const RespValue& request, const RespValue& response) {
+    if (response.type() != RespType::BulkString) {
+        return;
+    }
+
+    auto request_type = request.type();
+    const std::string *key = nullptr;
+
+    // The only two things cachable right now are GET and MGET. MGETs are tracked
+    // as a CompositeArray internally.
+    if (request_type == RespType::Array && absl::AsciiStrToLower(request.asArray()[0].asString()) == "get") {
+        key = &(request.asArray()[1].asString());
+    } else if (request_type == RespType::CompositeArray && absl::AsciiStrToLower(request.asCompositeArray().command()->asString()) == "get") {
+        auto start_index = request.asCompositeArray().begin().index_;
+        key = &(request.asCompositeArray().baseArray()->asArray()[start_index].asString());
+    } else {
+        // non cachable request
+        return;
+    }
+
+    RespValuePtr cache_request(new RespValue());
     std::vector<RespValue> values(5);
     values[0].type(RespType::BulkString);
     values[0].asString() = "set";
     values[1].type(RespType::BulkString);
-    values[1].asString() = key;
+    values[1].asString() = *key;
     values[2].type(RespType::BulkString);
-    values[2].asString() = value;
+    values[2].asString() = response.asString();
 
     // Set a default TTL to ensure that even if we miss an invalidation
     // message from the server that the value will auto expire.
@@ -34,12 +54,12 @@ void CacheImpl::set(const std::string &key, const std::string& value) {
     values[4].type(RespType::BulkString);
     values[4].asString() = "900";
 
-    request->type(RespType::Array);
-    request->asArray().swap(values);
+    cache_request->type(RespType::Array);
+    cache_request->asArray().swap(values);
 
     pending_requests_.emplace_back(Operation::Set);
 
-    client_->makeRequest(*request, *this);
+    client_->makeRequest(*cache_request, *this);
 }
 
 void CacheImpl::expire(const RespValue& keys) {
