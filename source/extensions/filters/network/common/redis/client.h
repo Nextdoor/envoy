@@ -227,7 +227,7 @@ public:
 
   virtual void makeCacheRequest(const RespValue& request) PURE;
   virtual void set(const std::string &key, const std::string& value) PURE;
-  virtual void expire(const std::string &key) PURE;
+  virtual void expire(const RespValue& keys) PURE;
   virtual void addCallbacks(CacheCallbacks& callbacks) PURE;
   virtual void clearCache(bool synchronous) PURE;
   virtual void initialize(const std::string& auth_username, const std::string& auth_password, bool clear_cache) PURE;

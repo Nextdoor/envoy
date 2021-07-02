@@ -42,14 +42,25 @@ void CacheImpl::set(const std::string &key, const std::string& value) {
     client_->makeRequest(*request, *this);
 }
 
-void CacheImpl::expire(const std::string &key) {
-    RespValuePtr request(new RespValue());
-    std::vector<RespValue> values(2);
-    values[0].type(RespType::BulkString);
-    values[0].asString() = "del";
-    values[1].type(RespType::BulkString);
-    values[1].asString() = key;
+void CacheImpl::expire(const RespValue& keys) {
+    // Normally we get a list of keys to expire but if the server did
+    // a FLUSHALL then the invalidate returns null to signify all keys
+    // must be invalidated.
+    if (keys.type() == Common::Redis::RespType::Null) {
+        clearCache(true);
+        return;
+    }
 
+    ASSERT(keys.type() == Common::Redis::RespType::Array);
+    const std::vector<RespValue>& key_arr = keys.asArray();
+
+    RespValuePtr request(new RespValue());
+    std::vector<RespValue> values(1);
+
+    values[0].type(RespType::BulkString);
+    values[0].asString() = "unlink";
+
+    values.insert(std::end(values), std::begin(key_arr), std::end(key_arr));
     request->type(RespType::Array);
     request->asArray().swap(values);
 
