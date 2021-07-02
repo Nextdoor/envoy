@@ -315,15 +315,7 @@ void ClientImpl::onCacheClose() {
 void ClientImpl::onRespValue(RespValuePtr&& value) {
   if (cache_ && value->type() == Common::Redis::RespType::Push && PushResponse::get().INVALIDATE == value->asArray()[0].asString()) {
     ASSERT(value->asArray().size() == 2);
-
-    if (value->asArray()[1].type() == Common::Redis::RespType::BulkString) {
-      cache_->expire(value->asArray()[1].asArray()[0].asString());
-    } else if (value->asArray()[1].type() == Common::Redis::RespType::Null) {
-      // On Null it means the FLUSHALL was run on Redis and entire cache must
-      // be cleared.
-      cache_->clearCache(true);
-    }
-
+    cache_->expire(value->asArray()[1]);
     return;
   }
 
