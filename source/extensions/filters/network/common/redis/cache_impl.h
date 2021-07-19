@@ -58,9 +58,11 @@ private:
     const Operation op_;
   };
 
+  using PendingCacheRequestPtr = std::unique_ptr<PendingCacheRequest>;
+
   Client::ClientPtr client_;
   std::list<Client::CacheCallbacks*> callbacks_;
-  std::list<PendingCacheRequest> pending_requests_;
+  std::list<PendingCacheRequestPtr> pending_requests_;
 };
 
 class CacheFactoryImpl : public Client::CacheFactory {
