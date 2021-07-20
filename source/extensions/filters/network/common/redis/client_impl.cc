@@ -467,7 +467,7 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
   CachePtr cp = nullptr;
   if (cache_host != nullptr) {
     // TODO(slava): use config from config file
-    auto cache_config = new ConfigImpl(createConnPoolSettings(20, true, false));
+    auto cache_config = new ConfigImpl(createConnPoolSettings(200, true, false));
     ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
                                       decoder_factory_, *cache_config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
     cp = cache_factory_.create(std::move(cache_client));
