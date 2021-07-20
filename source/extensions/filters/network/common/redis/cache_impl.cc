@@ -14,7 +14,7 @@ namespace Common {
 namespace Redis {
 
 void CacheImpl::makeCacheRequest(const RespValue& request) {
-    pending_requests_.emplace_back(Operation::Get);
+    pending_requests_.emplace_back(std::move(new PendingCacheRequest(Operation::Get)));
     client_->makeRequest(request, *this);
 }
 
@@ -57,7 +57,7 @@ void CacheImpl::set(const RespValue& request, const RespValue& response) {
     cache_request->type(RespType::Array);
     cache_request->asArray().swap(values);
 
-    pending_requests_.emplace_back(Operation::Set);
+    pending_requests_.emplace_back(std::move(new PendingCacheRequest(Operation::Set)));
 
     client_->makeRequest(*cache_request, *this);
 }
@@ -84,7 +84,7 @@ void CacheImpl::expire(const RespValue& keys) {
     request->type(RespType::Array);
     request->asArray().swap(values);
 
-    pending_requests_.emplace_back(Operation::Expire);
+    pending_requests_.emplace_back(std::move(new PendingCacheRequest(Operation::Expire)));
 
     client_->makeRequest(*request, *this);
 }
@@ -105,7 +105,7 @@ void CacheImpl::clearCache(bool synchronous) {
     request->type(RespType::Array);
     request->asArray().swap(values);
 
-    pending_requests_.emplace_back(Operation::Flush);
+    pending_requests_.emplace_back(std::move(new PendingCacheRequest(Operation::Flush)));
     client_->makeRequest(*request, *this);
 }
 
@@ -124,10 +124,10 @@ void CacheImpl::initialize(const std::string& auth_username, const std::string& 
 void CacheImpl::onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) {
     ASSERT(!pending_requests_.empty());
 
-    PendingCacheRequest& req = pending_requests_.front();
+    PendingCacheRequestPtr req = std::move(pending_requests_.front());
     pending_requests_.pop_front();
 
-    switch (req.op_) {
+    switch (req->op_) {
     case Operation::Set:
     case Operation::Expire:
     case Operation::Flush:

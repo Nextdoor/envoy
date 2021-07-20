@@ -126,7 +126,7 @@ private:
     bool canceled_{};
     Stats::TimespanPtr aggregate_request_timer_;
     Stats::TimespanPtr command_request_timer_;
-    const RespValue& request_;
+    const RespValue request_;
   };
 
   using PendingRequestPtr = std::unique_ptr<PendingRequest>;
