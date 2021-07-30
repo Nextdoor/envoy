@@ -2,6 +2,7 @@
 #include "common/common/logger.h"
 #include "common/network/address_impl.h"
 
+#include "common/protobuf/utility.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
@@ -14,6 +15,7 @@
 #include "extensions/filters/network/common/redis/utility.h"
 #include <memory>
 #include <optional>
+#include <ratio>
 #include <string>
 
 
@@ -43,7 +45,12 @@ ConfigImpl::ConfigImpl(
                // as the buffer is flushed on each request immediately.
       max_upstream_unknown_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
-      enable_command_stats_(config.enable_command_stats()) {
+      enable_command_stats_(config.enable_command_stats()),
+      cache_cluster_(config.cache_cluster()),
+      cache_op_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, cache_op_timeout, 20)),
+      cache_max_buffer_size_before_flush_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_max_buffer_size_before_flush, 0)),
+      cache_buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, cache_buffer_flush_timeout, 3)),
+      cache_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, cache_ttl, 3)) {
   switch (config.read_policy()) {
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Primary;
@@ -443,18 +450,17 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
 
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
-envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings createConnPoolSettings(
-    int64_t millis = 20, bool hashtagging = true, bool redirection_support = true,
-    uint32_t max_unknown_conns = 100,
-    envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::ReadPolicy
-        read_policy = envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
-            ConnPoolSettings::MASTER) {
+envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings createCacheConnSettings(const Config& config) {
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings setting{};
-  setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(millis));
-  setting.set_enable_hashtagging(hashtagging);
-  setting.set_enable_redirection(redirection_support);
-  setting.mutable_max_upstream_unknown_connections()->set_value(max_unknown_conns);
-  setting.set_read_policy(read_policy);
+  setting.mutable_op_timeout()->CopyFrom(
+    Protobuf::util::TimeUtil::MillisecondsToDuration(config.cacheOpTimeout().count()));
+  setting.mutable_buffer_flush_timeout()->CopyFrom(
+    Protobuf::util::TimeUtil::MillisecondsToDuration(config.cacheBufferFlushTimeoutInMs().count()));
+  setting.set_max_buffer_size_before_flush(config.cacheMaxBufferSizeBeforeFlush());
+  setting.set_enable_hashtagging(false);
+  setting.set_enable_redirection(false);
+  setting.mutable_max_upstream_unknown_connections()->set_value(100);
+  setting.set_read_policy(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER);
   return setting;
 }
 
@@ -466,11 +472,10 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Upstream::HostConstSharedPtr cache_host) {
   CachePtr cp = nullptr;
   if (cache_host != nullptr) {
-    // TODO(slava): use config from config file
-    auto cache_config = new ConfigImpl(createConnPoolSettings(200, true, false));
+    auto cache_config = new ConfigImpl(createCacheConnSettings(config));
     ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
                                       decoder_factory_, *cache_config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
-    cp = cache_factory_.create(std::move(cache_client));
+    cp = cache_factory_.create(std::move(cache_client), config.cacheTtl());
     cp->initialize(auth_username, auth_password, true);
   }
 

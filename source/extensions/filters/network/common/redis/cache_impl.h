@@ -21,7 +21,8 @@ enum class Operation {
 
 class CacheImpl : public Client::Cache, public Logger::Loggable<Logger::Id::redis>, public Client::ClientCallbacks, public Network::ConnectionCallbacks {
 public:
-  CacheImpl(Client::ClientPtr&& client) : client_(std::move(client)) {
+  CacheImpl(Client::ClientPtr&& client, std::chrono::milliseconds cache_ttl) : client_(std::move(client)){
+    cache_ttl_ = std::to_string(cache_ttl.count());
     client_->addConnectionCallbacks(*this);
   }
   ~CacheImpl() override;
@@ -61,6 +62,7 @@ private:
   using PendingCacheRequestPtr = std::unique_ptr<PendingCacheRequest>;
 
   Client::ClientPtr client_;
+  std::string cache_ttl_;
   std::list<Client::CacheCallbacks*> callbacks_;
   std::list<PendingCacheRequestPtr> pending_requests_;
 };
@@ -68,8 +70,8 @@ private:
 class CacheFactoryImpl : public Client::CacheFactory {
 public:
   // RedisProxy::ConnPool::ClientFactoryImpl
-  Client::CachePtr create(Client::ClientPtr&& client) override {
-    return Client::CachePtr{new CacheImpl(std::move(client))};
+  Client::CachePtr create(Client::ClientPtr&& client, std::chrono::milliseconds cache_ttl) override {
+    return Client::CachePtr{new CacheImpl(std::move(client), cache_ttl)};
   }
 };
 

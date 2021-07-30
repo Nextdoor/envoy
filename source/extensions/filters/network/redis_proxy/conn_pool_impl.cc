@@ -243,12 +243,14 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
       throw EnvoyException("Filter was deleted in the main thread");
     }
 
-    // TODO(slava): make this configurable
+    // Cache cluster configuration
     Upstream::HostConstSharedPtr cache_host = nullptr;
-    auto cache_cluster = shared_parent->cm_.getThreadLocalCluster("redis_cache_cluster");
-    if (cache_cluster != nullptr) {
-      cache_host = cache_cluster->loadBalancer().chooseHost(nullptr);
-      ASSERT(cache_host != nullptr);
+    if (!config_->cacheCluster().empty()) {
+      auto cache_cluster = shared_parent->cm_.getThreadLocalCluster(config_->cacheCluster());
+      if (cache_cluster != nullptr) {
+        cache_host = cache_cluster->loadBalancer().chooseHost(nullptr);
+        ASSERT(cache_host != nullptr);
+      }
     }
 
     client->redis_client_ =

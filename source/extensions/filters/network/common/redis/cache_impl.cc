@@ -50,9 +50,9 @@ void CacheImpl::set(const RespValue& request, const RespValue& response) {
     // Set a default TTL to ensure that even if we miss an invalidation
     // message from the server that the value will auto expire.
     values[3].type(RespType::BulkString);
-    values[3].asString() = "EX";
+    values[3].asString() = "PX";
     values[4].type(RespType::BulkString);
-    values[4].asString() = "900";
+    values[4].asString() = cache_ttl_;
 
     cache_request->type(RespType::Array);
     cache_request->asArray().swap(values);

@@ -66,6 +66,14 @@ public:
   bool enableCommandStats() const override { return enable_command_stats_; }
   ReadPolicy readPolicy() const override { return read_policy_; }
 
+  std::string cacheCluster() const override { return cache_cluster_; }
+  std::chrono::milliseconds cacheOpTimeout() const override { return cache_op_timeout_; }
+  uint32_t cacheMaxBufferSizeBeforeFlush() const override { return cache_max_buffer_size_before_flush_; }
+  std::chrono::milliseconds cacheBufferFlushTimeoutInMs() const override {
+    return cache_buffer_flush_timeout_;
+  }
+  std::chrono::milliseconds cacheTtl() const override { return cache_ttl_; }
+
 private:
   const std::chrono::milliseconds op_timeout_;
   const bool enable_hashtagging_;
@@ -75,6 +83,12 @@ private:
   const uint32_t max_upstream_unknown_connections_;
   const bool enable_command_stats_;
   ReadPolicy read_policy_;
+
+  const std::string cache_cluster_;
+  const std::chrono::milliseconds cache_op_timeout_;
+  const uint32_t cache_max_buffer_size_before_flush_;
+  const std::chrono::milliseconds cache_buffer_flush_timeout_;
+  const std::chrono::milliseconds cache_ttl_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public CacheCallbacks, public Network::ConnectionCallbacks, public Logger::Loggable<Logger::Id::redis> {

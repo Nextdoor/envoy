@@ -234,6 +234,23 @@ private:
     Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
       return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Primary;
     }
+    // Caching
+    std::string cacheCluster() const override {
+      return "";
+    }
+    std::chrono::milliseconds cacheOpTimeout() const override {
+      return std::chrono::milliseconds(20);
+    }
+    unsigned int cacheMaxBufferSizeBeforeFlush() const override {
+      return 0;
+    }
+    // Forces an immediate flush
+    std::chrono::milliseconds cacheBufferFlushTimeoutInMs() const override {
+      return std::chrono::milliseconds(0);
+    }
+    std::chrono::milliseconds cacheTtl() const override {
+      return std::chrono::milliseconds(0);
+    }
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
