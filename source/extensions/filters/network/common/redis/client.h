@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "envoy/upstream/cluster_manager.h"
 
@@ -184,6 +185,32 @@ public:
    * @return the read policy the proxy should use.
    */
   virtual ReadPolicy readPolicy() const PURE;
+
+  /**
+   * @return name of the cluster to use to cache requests.
+   */
+  virtual std::string cacheCluster() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the timeout for an individual redis operation. Currently,
+   *         all operations use the same timeout.
+   */
+  virtual std::chrono::milliseconds cacheOpTimeout() const PURE;
+
+  /**
+   * @return buffer size for batching commands for a cache upstream host.
+   */
+  virtual uint32_t cacheMaxBufferSizeBeforeFlush() const PURE;
+
+  /**
+   * @return timeout for batching commands for a cache upstream host.
+   */
+  virtual std::chrono::milliseconds cacheBufferFlushTimeoutInMs() const PURE;
+
+  /**
+   * @return per key TTL value for the cache.
+   */
+  virtual std::chrono::milliseconds cacheTtl() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -238,7 +265,7 @@ using CachePtr = std::unique_ptr<Cache>;
 class CacheFactory {
 public:
   virtual ~CacheFactory() = default;
-  virtual CachePtr create(ClientPtr&& client) PURE;
+  virtual CachePtr create(ClientPtr&& client, std::chrono::milliseconds cache_ttl) PURE;
 };
 
 } // namespace Client
