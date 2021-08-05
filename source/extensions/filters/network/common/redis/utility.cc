@@ -44,7 +44,7 @@ HelloRequest::HelloRequest() {
 ClientTrackingRequest::ClientTrackingRequest(bool enable_bcast_mode) {
   int val_size = 3;
   if (enable_bcast_mode) {
-    enable_bcast_mode += 1;
+    val_size += 1;
   }
 
   std::vector<RespValue> values(val_size);
