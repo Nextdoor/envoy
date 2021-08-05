@@ -41,16 +41,25 @@ HelloRequest::HelloRequest() {
   asArray().swap(values);
 }
 
-ClientTrackingRequest::ClientTrackingRequest() {
-  std::vector<RespValue> values(4);
+ClientTrackingRequest::ClientTrackingRequest(bool enable_bcast_mode) {
+  int val_size = 3;
+  if (enable_bcast_mode) {
+    enable_bcast_mode += 1;
+  }
+
+  std::vector<RespValue> values(val_size);
   values[0].type(RespType::BulkString);
   values[0].asString() = "client";
   values[1].type(RespType::BulkString);
   values[1].asString() = "tracking";
   values[2].type(RespType::BulkString);
   values[2].asString() = "on";
-  values[3].type(RespType::BulkString);
-  values[3].asString() = "bcast";
+
+  if (enable_bcast_mode) {
+    values[3].type(RespType::BulkString);
+    values[3].asString() = "bcast";
+  }
+
   type(RespType::Array);
   asArray().swap(values);
 }
