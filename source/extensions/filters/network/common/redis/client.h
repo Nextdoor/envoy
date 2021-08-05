@@ -211,6 +211,13 @@ public:
    * @return per key TTL value for the cache.
    */
   virtual std::chrono::milliseconds cacheTtl() const PURE;
+
+  /**
+   * @return when enabled, client subscribes to all cache invalidations and not just the ones
+   *         keys it requested. This is typically done in order to decrease pressure on the
+   *         upstream Redis servers.
+   */
+  virtual bool cacheEnableBcastMode() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

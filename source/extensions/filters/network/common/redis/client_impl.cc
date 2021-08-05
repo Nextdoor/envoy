@@ -50,7 +50,8 @@ ConfigImpl::ConfigImpl(
       cache_op_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, cache_op_timeout, 20)),
       cache_max_buffer_size_before_flush_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_max_buffer_size_before_flush, 0)),
       cache_buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, cache_buffer_flush_timeout, 3)),
-      cache_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, cache_ttl, 3)) {
+      cache_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, cache_ttl, 3)),
+      cache_enable_bcast_mode_(config.cache_enable_bcast_mode()) {
   switch (config.read_policy()) {
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Primary;
@@ -436,7 +437,7 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
   // Turn on client tracking
   if (cache_) {
     cache_->addCallbacks(*this);
-    Utility::ClientTrackingRequest client_tracking_request;
+    Utility::ClientTrackingRequest client_tracking_request(config_.cacheEnableBcastMode());
     makeRequest(client_tracking_request, null_pool_callbacks);
   }
 

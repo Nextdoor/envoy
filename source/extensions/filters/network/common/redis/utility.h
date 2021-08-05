@@ -24,7 +24,7 @@ public:
 
 class ClientTrackingRequest : public Redis::RespValue {
 public:
-  ClientTrackingRequest();
+  ClientTrackingRequest(bool broadcast);
 };
 
 RespValuePtr makeError(const std::string& error);

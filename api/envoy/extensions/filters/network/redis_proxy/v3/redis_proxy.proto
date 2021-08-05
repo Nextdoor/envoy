@@ -28,7 +28,7 @@ message RedisProxy {
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 14]
+  // [#next-free-field: 15]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -154,6 +154,12 @@ message RedisProxy {
 
     // Per key TTL for cached keys in milliseconds.
     google.protobuf.Duration cache_ttl = 13;
+
+    // Enable the use of bcast mode where the client tells Redsd to send all cache invalidation
+    // messages and not just invalidations for keys it requested. This decreases the amount of
+    // overhead the server needs to have per client. However, for Envoy this means that it will
+    // recieve multiple invalidation messages for each worker thread.
+    bool cache_enable_bcast_mode = 14;
   }
 
   message PrefixRoutes {
