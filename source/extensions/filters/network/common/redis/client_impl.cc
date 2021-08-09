@@ -31,6 +31,22 @@ namespace {
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 } // namespace
 
+// Transforms the proto list of 'cache_ignore_key_prefixes' into a vector of std::string
+std::vector<std::string>
+convertKeyPrefixes(const Protobuf::RepeatedPtrField<std::string>& cache_ignore_key_prefixes) {
+  std::vector<std::string> prefixes;
+
+  if (!cache_ignore_key_prefixes.empty()) {
+    prefixes.reserve(cache_ignore_key_prefixes.size());
+
+    for (const auto& prefix : cache_ignore_key_prefixes) {
+      prefixes.emplace_back(prefix);
+    }
+  }
+
+  return prefixes;
+}
+
 ConfigImpl::ConfigImpl(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
         config)
@@ -51,7 +67,8 @@ ConfigImpl::ConfigImpl(
       cache_max_buffer_size_before_flush_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_max_buffer_size_before_flush, 0)),
       cache_buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, cache_buffer_flush_timeout, 3)),
       cache_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, cache_ttl, 3)),
-      cache_enable_bcast_mode_(config.cache_enable_bcast_mode()) {
+      cache_enable_bcast_mode_(config.cache_enable_bcast_mode()),
+      cache_ignore_key_prefixes_(convertKeyPrefixes(config.cache_ignore_key_prefixes())) {
   switch (config.read_policy()) {
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Primary;
@@ -141,12 +158,26 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
 
   PendingRequestPtr prp{new PendingRequest(*this, callbacks, command, request)};
 
+  // Send request to cache
   if (cache_ && (
         (request.type() == RespType::Array && absl::AsciiStrToLower(request.asArray()[0].asString()) == "get") ||
         (request.type() == RespType::CompositeArray && absl::AsciiStrToLower(request.asCompositeArray().command()->asString()) == "get"))) {
-    pending_cache_requests_.push_back(std::move(prp));
-    cache_->makeCacheRequest(request);
-    return pending_cache_requests_.back().get();
+
+    // Verify key is not in the ignore list for caching. If it is
+    // then don't query the cache.
+    bool skip_cache = false;
+    for (const auto& prefix : config_.cacheIgnoreKeyPrefixes()) {
+      if (request.asArray()[1].asString().rfind(prefix, 0) != std::string::npos) {
+        skip_cache = true;
+        break;
+      }
+    }
+
+    if (!skip_cache) {
+      pending_cache_requests_.push_back(std::move(prp));
+      cache_->makeCacheRequest(request);
+      return pending_cache_requests_.back().get();
+    }
   }
 
   if (config_.enableCommandStats()) {

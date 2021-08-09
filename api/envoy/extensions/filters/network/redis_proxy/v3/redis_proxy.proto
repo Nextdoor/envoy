@@ -28,7 +28,7 @@ message RedisProxy {
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 15]
+  // [#next-free-field: 16]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -160,6 +160,10 @@ message RedisProxy {
     // overhead the server needs to have per client. However, for Envoy this means that it will
     // recieve multiple invalidation messages for each worker thread.
     bool cache_enable_bcast_mode = 14;
+
+    // List of key prefixes to ignore for caching. Keys matching a prefix will not be looked
+    // for in the cache and requests will go directly to the upstream.
+    repeated string cache_ignore_key_prefixes = 15;
   }
 
   message PrefixRoutes {

@@ -252,6 +252,7 @@ private:
       return std::chrono::milliseconds(0);
     }
     bool cacheEnableBcastMode() const override { return false; };
+    std::vector<std::string> cacheIgnoreKeyPrefixes() const override { return std::vector<std::string>(); };
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
