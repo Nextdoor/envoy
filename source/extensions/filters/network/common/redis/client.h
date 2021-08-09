@@ -218,6 +218,12 @@ public:
    *         upstream Redis servers.
    */
   virtual bool cacheEnableBcastMode() const PURE;
+
+  /**
+   * @return list of key prefixes to ignore for caching. Requests for keys matching any of
+   * these prefixes will go to the upstream and won't be looked for in the cache.
+   */
+  virtual std::vector<std::string> cacheIgnoreKeyPrefixes() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
