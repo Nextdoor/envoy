@@ -121,7 +121,27 @@ void CacheImpl::expire(const RespValue& keys) {
     values[0].type(RespType::BulkString);
     values[0].asString() = "UNLINK";
 
-    values.insert(std::end(values), std::begin(key_arr), std::end(key_arr));
+    for (const RespValue& key : key_arr) {
+        const std::string& kstr = key.asString();
+        bool skip_key;
+        for (const auto& prefix : ignore_key_prefixes_) {
+            if (kstr.rfind(prefix, 0) != std::string::npos) {
+                skip_key = true;
+                break;
+            }
+        }
+
+        if(!skip_key) {
+            values.emplace_back(key);
+        }
+    }
+
+    // If values didn't get keys added due to filtering then there is
+    // nothing to do.
+    if (values.size() == 1) {
+        return;
+    }
+
     request->type(RespType::Array);
     request->asArray().swap(values);
 
