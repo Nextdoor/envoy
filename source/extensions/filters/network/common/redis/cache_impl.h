@@ -21,12 +21,15 @@ enum class Operation {
 
 class CacheImpl : public Client::Cache, public Logger::Loggable<Logger::Id::redis>, public Client::ClientCallbacks, public Network::ConnectionCallbacks {
 public:
-  CacheImpl(Client::ClientPtr&& client, std::chrono::milliseconds cache_ttl) : client_(std::move(client)){
+  CacheImpl(Client::ClientPtr&& client, std::chrono::milliseconds cache_ttl, std::vector<std::string> ignore_key_prefixes) :
+    client_(std::move(client)), ignore_key_prefixes_(ignore_key_prefixes) {
+
     cache_ttl_ = std::to_string(cache_ttl.count());
     client_->addConnectionCallbacks(*this);
   }
   ~CacheImpl() override;
-  void makeCacheRequest(const RespValue& request) override;
+  const std::string* getRequestKey(const RespValue& request) override;
+  bool makeCacheRequest(const RespValue& request) override;
   void set(const RespValue& request, const RespValue& response) override;
   void expire(const RespValue& keys) override;
   void addCallbacks(Client::CacheCallbacks& callbacks) override {
@@ -65,13 +68,14 @@ private:
   std::string cache_ttl_;
   std::list<Client::CacheCallbacks*> callbacks_;
   std::list<PendingCacheRequestPtr> pending_requests_;
+  std::vector<std::string> ignore_key_prefixes_;
 };
 
 class CacheFactoryImpl : public Client::CacheFactory {
 public:
   // RedisProxy::ConnPool::ClientFactoryImpl
-  Client::CachePtr create(Client::ClientPtr&& client, std::chrono::milliseconds cache_ttl) override {
-    return Client::CachePtr{new CacheImpl(std::move(client), cache_ttl)};
+  Client::CachePtr create(Client::ClientPtr&& client, std::chrono::milliseconds cache_ttl, std::vector<std::string> ignore_key_prefixes) override {
+    return Client::CachePtr{new CacheImpl(std::move(client), cache_ttl, ignore_key_prefixes)};
   }
 };
 
