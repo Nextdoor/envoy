@@ -141,26 +141,10 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
 
   PendingRequestPtr prp{new PendingRequest(*this, callbacks, command, request)};
 
-  // Send request to cache
-  if (cache_ && (
-        (request.type() == RespType::Array && absl::AsciiStrToLower(request.asArray()[0].asString()) == "get") ||
-        (request.type() == RespType::CompositeArray && absl::AsciiStrToLower(request.asCompositeArray().command()->asString()) == "get"))) {
-
-    // Verify key is not in the ignore list for caching. If it is
-    // then don't query the cache.
-    bool skip_cache = false;
-    for (const auto& prefix : config_.cacheIgnoreKeyPrefixes()) {
-      if (request.asArray()[1].asString().rfind(prefix, 0) != std::string::npos) {
-        skip_cache = true;
-        break;
-      }
-    }
-
-    if (!skip_cache) {
-      pending_cache_requests_.push_back(std::move(prp));
-      cache_->makeCacheRequest(request);
-      return pending_cache_requests_.back().get();
-    }
+  // Send request to cache. Cache will decide if request is cachable.
+  if (cache_ && cache_->makeCacheRequest(request)) {
+    pending_cache_requests_.push_back(std::move(prp));
+    return pending_cache_requests_.back().get();
   }
 
   if (config_.enableCommandStats()) {
@@ -490,7 +474,7 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
     auto cache_config = new ConfigImpl(createCacheConnSettings(config));
     ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
                                       decoder_factory_, *cache_config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
-    cp = cache_factory_.create(std::move(cache_client), config.cacheTtl());
+    cp = cache_factory_.create(std::move(cache_client), config.cacheTtl(), config.cacheIgnoreKeyPrefixes());
     cp->initialize(auth_username, auth_password, true);
   }
 

@@ -265,7 +265,7 @@ class Cache : public Event::DeferredDeletable {
 public:
   ~Cache() override = default;
 
-  virtual void makeCacheRequest(const RespValue& request) PURE;
+  virtual bool makeCacheRequest(const RespValue& request) PURE;
   virtual void set(const RespValue& request, const RespValue& response) PURE;
   virtual void expire(const RespValue& keys) PURE;
   virtual void addCallbacks(CacheCallbacks& callbacks) PURE;
@@ -278,7 +278,7 @@ using CachePtr = std::unique_ptr<Cache>;
 class CacheFactory {
 public:
   virtual ~CacheFactory() = default;
-  virtual CachePtr create(ClientPtr&& client, std::chrono::milliseconds cache_ttl) PURE;
+  virtual CachePtr create(ClientPtr&& client, std::chrono::milliseconds cache_ttl, std::vector<std::string> ignore_key_prefixes) PURE;
 };
 
 } // namespace Client

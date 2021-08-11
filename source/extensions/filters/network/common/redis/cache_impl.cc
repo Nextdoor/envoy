@@ -13,9 +13,45 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-void CacheImpl::makeCacheRequest(const RespValue& request) {
+const std::string* CacheImpl::getRequestKey(const RespValue& request) {
+    const std::string *key = nullptr;
+
+    if (request.type() == RespType::Array && absl::AsciiStrToLower(request.asArray()[0].asString()) == "get") {
+        key = &(request.asArray()[1].asString());
+    } else if (request.type() == RespType::CompositeArray && absl::AsciiStrToLower(request.asCompositeArray().command()->asString()) == "get") {
+        auto start_index = request.asCompositeArray().begin().index_;
+        key = &(request.asCompositeArray().baseArray()->asArray()[start_index].asString());
+    }
+
+    return key;
+}
+
+bool CacheImpl::makeCacheRequest(const RespValue& request) {
+    if (!((request.type() == RespType::Array && absl::AsciiStrToLower(request.asArray()[0].asString()) == "get") ||
+        (request.type() == RespType::CompositeArray && absl::AsciiStrToLower(request.asCompositeArray().command()->asString()) == "get"))) {
+        return false;
+    }
+
+    const std::string *key = getRequestKey(request);
+    ASSERT(key != nullptr);
+
+    // Verify key is not in the ignore list for caching. If it is
+    // then don't query the cache.
+    bool skip_cache = false;
+    for (const auto& prefix : ignore_key_prefixes_) {
+      if (key->rfind(prefix, 0) != std::string::npos) {
+        skip_cache = true;
+        break;
+      }
+    }
+
+    if (skip_cache) {
+        return false;
+    }
+
     pending_requests_.emplace_back(std::move(new PendingCacheRequest(Operation::Get)));
     client_->makeRequest(request, *this);
+    return true;
 }
 
 void CacheImpl::set(const RespValue& request, const RespValue& response) {
@@ -23,25 +59,30 @@ void CacheImpl::set(const RespValue& request, const RespValue& response) {
         return;
     }
 
-    auto request_type = request.type();
-    const std::string *key = nullptr;
+    const std::string *key = getRequestKey(request);
+    if (key == nullptr) {
+        // non cachable if we can't figure out what the key is
+        return;
+    }
 
-    // The only two things cachable right now are GET and MGET. MGETs are tracked
-    // as a CompositeArray internally.
-    if (request_type == RespType::Array && absl::AsciiStrToLower(request.asArray()[0].asString()) == "get") {
-        key = &(request.asArray()[1].asString());
-    } else if (request_type == RespType::CompositeArray && absl::AsciiStrToLower(request.asCompositeArray().command()->asString()) == "get") {
-        auto start_index = request.asCompositeArray().begin().index_;
-        key = &(request.asCompositeArray().baseArray()->asArray()[start_index].asString());
-    } else {
-        // non cachable request
+    // Verify key is not in the ignore list for caching. If it is
+    // then don't set value in cache.
+    bool skip_caching = false;
+    for (const auto& prefix : ignore_key_prefixes_) {
+      if (key->rfind(prefix, 0) != std::string::npos) {
+        skip_caching = true;
+        break;
+      }
+    }
+
+    if (skip_caching) {
         return;
     }
 
     RespValuePtr cache_request(new RespValue());
     std::vector<RespValue> values(5);
     values[0].type(RespType::BulkString);
-    values[0].asString() = "set";
+    values[0].asString() = "SET";
     values[1].type(RespType::BulkString);
     values[1].asString() = *key;
     values[2].type(RespType::BulkString);
@@ -78,9 +119,29 @@ void CacheImpl::expire(const RespValue& keys) {
     std::vector<RespValue> values(1);
 
     values[0].type(RespType::BulkString);
-    values[0].asString() = "unlink";
+    values[0].asString() = "UNLINK";
 
-    values.insert(std::end(values), std::begin(key_arr), std::end(key_arr));
+    for (const RespValue& key : key_arr) {
+        const std::string& kstr = key.asString();
+        bool skip_key;
+        for (const auto& prefix : ignore_key_prefixes_) {
+            if (kstr.rfind(prefix, 0) != std::string::npos) {
+                skip_key = true;
+                break;
+            }
+        }
+
+        if(!skip_key) {
+            values.emplace_back(key);
+        }
+    }
+
+    // If values didn't get keys added due to filtering then there is
+    // nothing to do.
+    if (values.size() == 1) {
+        return;
+    }
+
     request->type(RespType::Array);
     request->asArray().swap(values);
 
