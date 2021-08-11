@@ -28,7 +28,6 @@ public:
     client_->addConnectionCallbacks(*this);
   }
   ~CacheImpl() override;
-  const std::string* getRequestKey(const RespValue& request) override;
   bool makeCacheRequest(const RespValue& request) override;
   void set(const RespValue& request, const RespValue& response) override;
   void expire(const RespValue& keys) override;
@@ -52,6 +51,8 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
 private:
+  const std::string* getRequestKey(const RespValue& request);
+
   struct PendingCacheRequest : public Client::PoolRequest {
     PendingCacheRequest(const Operation op);
     ~PendingCacheRequest() override = default;

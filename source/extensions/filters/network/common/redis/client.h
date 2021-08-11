@@ -265,7 +265,6 @@ class Cache : public Event::DeferredDeletable {
 public:
   ~Cache() override = default;
 
-  virtual const std::string* getRequestKey(const RespValue& request) PURE;
   virtual bool makeCacheRequest(const RespValue& request) PURE;
   virtual void set(const RespValue& request, const RespValue& response) PURE;
   virtual void expire(const RespValue& keys) PURE;
