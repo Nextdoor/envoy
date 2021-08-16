@@ -123,7 +123,7 @@ void CacheImpl::expire(const RespValue& keys) {
 
     for (const RespValue& key : key_arr) {
         const std::string& kstr = key.asString();
-        bool skip_key;
+        bool skip_key = false;
         for (const auto& prefix : ignore_key_prefixes_) {
             if (kstr.rfind(prefix, 0) != std::string::npos) {
                 skip_key = true;
