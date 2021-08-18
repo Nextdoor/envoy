@@ -30,7 +30,8 @@ public:
   ~CacheImpl() override;
   bool makeCacheRequest(const RespValue& request) override;
   void set(const RespValue& request, const RespValue& response) override;
-  void expire(const RespValue& keys) override;
+  void invalidate(const RespValue& keys) override;
+  void expire(const RespValue& request) override;
   void addCallbacks(Client::CacheCallbacks& callbacks) override {
     this->callbacks_.push_front(&callbacks);
   }
@@ -51,7 +52,8 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
 private:
-  const std::string* getRequestKey(const RespValue& request);
+  const std::string* readRequestKey(const RespValue& request);
+  const std::string* writeRequestKey(const RespValue& request);
 
   struct PendingCacheRequest : public Client::PoolRequest {
     PendingCacheRequest(const Operation op);
