@@ -147,6 +147,11 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     return pending_cache_requests_.back().get();
   }
 
+  // Send invalidation to the cache if we're doing a set and key is cacheable
+  if (cache_) {
+    cache_->expire(request);
+  }
+
   if (config_.enableCommandStats()) {
     redis_command_stats_->updateStatsTotal(scope_, command);
   }
@@ -322,7 +327,7 @@ void ClientImpl::onCacheClose() {
 void ClientImpl::onRespValue(RespValuePtr&& value) {
   if (cache_ && value->type() == Common::Redis::RespType::Push && PushResponse::get().INVALIDATE == value->asArray()[0].asString()) {
     ASSERT(value->asArray().size() == 2);
-    cache_->expire(value->asArray()[1]);
+    cache_->invalidate(value->asArray()[1]);
     return;
   }
 

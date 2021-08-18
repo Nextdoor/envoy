@@ -13,7 +13,7 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-const std::string* CacheImpl::getRequestKey(const RespValue& request) {
+const std::string* CacheImpl::readRequestKey(const RespValue& request) {
     const std::string *key = nullptr;
 
     if (request.type() == RespType::Array && absl::AsciiStrToLower(request.asArray()[0].asString()) == "get") {
@@ -26,14 +26,27 @@ const std::string* CacheImpl::getRequestKey(const RespValue& request) {
     return key;
 }
 
-bool CacheImpl::makeCacheRequest(const RespValue& request) {
-    if (!((request.type() == RespType::Array && absl::AsciiStrToLower(request.asArray()[0].asString()) == "get") ||
-        (request.type() == RespType::CompositeArray && absl::AsciiStrToLower(request.asCompositeArray().command()->asString()) == "get"))) {
-        return false;
+const std::string* CacheImpl::writeRequestKey(const RespValue& request) {
+    const std::string *key = nullptr;
+
+    if (request.type() == RespType::Array && absl::AsciiStrToLower(request.asArray()[0].asString()) == "set") {
+        key = &(request.asArray()[1].asString());
+    } else if (request.type() == RespType::CompositeArray) {
+        const std::string& cmd = absl::AsciiStrToLower(request.asCompositeArray().command()->asString());
+        if (cmd == "set" || cmd == "del") {
+            auto start_index = request.asCompositeArray().begin().index_;
+            key = &(request.asCompositeArray().baseArray()->asArray()[start_index].asString());
+        }
     }
 
-    const std::string *key = getRequestKey(request);
-    ASSERT(key != nullptr);
+    return key;
+}
+
+bool CacheImpl::makeCacheRequest(const RespValue& request) {
+    const std::string *key = readRequestKey(request);
+    if (key == nullptr) {
+        return false;
+    }
 
     // Verify key is not in the ignore list for caching. If it is
     // then don't query the cache.
@@ -59,7 +72,7 @@ void CacheImpl::set(const RespValue& request, const RespValue& response) {
         return;
     }
 
-    const std::string *key = getRequestKey(request);
+    const std::string *key = readRequestKey(request);
     if (key == nullptr) {
         // non cachable if we can't figure out what the key is
         return;
@@ -103,8 +116,43 @@ void CacheImpl::set(const RespValue& request, const RespValue& response) {
     client_->makeRequest(*cache_request, *this);
 }
 
-void CacheImpl::expire(const RespValue& keys) {
-    // Normally we get a list of keys to expire but if the server did
+void CacheImpl::expire(const RespValue& request) {
+    const std::string *key = writeRequestKey(request);
+    if (key == nullptr) {
+        // non cachable if we can't figure out what the key is
+        return;
+    }
+
+    bool skip_key = false;
+    for (const auto& prefix : ignore_key_prefixes_) {
+        if (key->rfind(prefix, 0) != std::string::npos) {
+            skip_key = true;
+            break;
+        }
+    }
+
+    if(skip_key) {
+        return;
+    }
+
+    RespValuePtr cache_request(new RespValue());
+    std::vector<RespValue> values(2);
+
+    values[0].type(RespType::BulkString);
+    values[0].asString() = "UNLINK";
+    values[1].type(RespType::BulkString);
+    values[1].asString() = *key;
+
+    cache_request->type(RespType::Array);
+    cache_request->asArray().swap(values);
+
+    pending_requests_.emplace_back(std::move(new PendingCacheRequest(Operation::Expire)));
+
+    client_->makeRequest(*cache_request, *this);
+}
+
+void CacheImpl::invalidate(const RespValue& keys) {
+    // Normally we get a list of keys to invalidate but if the server did
     // a FLUSHALL then the invalidate returns null to signify all keys
     // must be invalidated.
     if (keys.type() == Common::Redis::RespType::Null) {

@@ -42,7 +42,7 @@ HelloRequest::HelloRequest() {
 }
 
 ClientTrackingRequest::ClientTrackingRequest(bool enable_bcast_mode) {
-  int val_size = 3;
+  int val_size = 4;
   if (enable_bcast_mode) {
     val_size += 1;
   }
@@ -54,10 +54,12 @@ ClientTrackingRequest::ClientTrackingRequest(bool enable_bcast_mode) {
   values[1].asString() = "tracking";
   values[2].type(RespType::BulkString);
   values[2].asString() = "on";
+  values[3].type(RespType::BulkString);
+  values[3].asString() = "noloop";
 
   if (enable_bcast_mode) {
-    values[3].type(RespType::BulkString);
-    values[3].asString() = "bcast";
+    values[4].type(RespType::BulkString);
+    values[4].asString() = "bcast";
   }
 
   type(RespType::Array);
