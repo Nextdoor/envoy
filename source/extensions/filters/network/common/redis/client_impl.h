@@ -75,6 +75,7 @@ public:
   std::chrono::milliseconds cacheTtl() const override { return cache_ttl_; }
   bool cacheEnableBcastMode() const override { return cache_enable_bcast_mode_; }
   std::vector<std::string> cacheIgnoreKeyPrefixes() const override { return cache_ignore_key_prefixes_; }
+  uint32_t cacheShards() const override { return cache_shards_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -93,6 +94,7 @@ private:
   const std::chrono::milliseconds cache_ttl_;
   const bool cache_enable_bcast_mode_;
   const std::vector<std::string> cache_ignore_key_prefixes_;
+  const uint32_t cache_shards_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public CacheCallbacks, public Network::ConnectionCallbacks, public Logger::Loggable<Logger::Id::redis> {

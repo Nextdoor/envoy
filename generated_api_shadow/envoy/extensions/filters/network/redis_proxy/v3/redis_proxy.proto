@@ -29,7 +29,7 @@ message RedisProxy {
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 16]
+  // [#next-free-field: 17]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -165,6 +165,10 @@ message RedisProxy {
     // List of key prefixes to ignore for caching. Keys matching a prefix will not be looked
     // for in the cache and requests will go directly to the upstream.
     repeated string cache_ignore_key_prefixes = 15;
+
+    // Number of shards to split cache into. This prevents the cache from being completely
+    // flushed when a single upstream host has issues and causes the cache to be flushed.
+    google.protobuf.UInt32Value cache_shards = 16 [(validate.rules).uint32 = {lt: 8192 gt: 0}];
   }
 
   message PrefixRoutes {

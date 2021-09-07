@@ -202,7 +202,7 @@ void CacheImpl::clearCache(bool synchronous) {
     RespValuePtr request(new RespValue());
     std::vector<RespValue> values(2);
     values[0].type(RespType::BulkString);
-    values[0].asString() = "FLUSHALL";
+    values[0].asString() = "FLUSHDB";
 
     values[1].type(RespType::BulkString);
     if (synchronous) {
@@ -218,8 +218,26 @@ void CacheImpl::clearCache(bool synchronous) {
     client_->makeRequest(*request, *this);
 }
 
-void CacheImpl::initialize(const std::string& auth_username, const std::string& auth_password, bool clear_cache) {
+void CacheImpl::selectDatabase(int db) {
+    RespValuePtr request(new RespValue());
+    std::vector<RespValue> values(2);
+    values[0].type(RespType::BulkString);
+    values[0].asString() = "SELECT";
+    values[1].type(RespType::BulkString);
+    values[1].asString() = std::to_string(db);
+
+    request->type(RespType::Array);
+    request->asArray().swap(values);
+
+    pending_requests_.emplace_back(std::move(new PendingCacheRequest(Operation::Select)));
+    client_->makeRequest(*request, *this);
+}
+
+void CacheImpl::initialize(const std::string& auth_username, const std::string& auth_password, bool clear_cache, int shard) {
     client_->initialize(auth_username, auth_password);
+
+    // Use redis databases for cache sharding
+    selectDatabase(shard);
 
     // Ensures that if the cache connection was ever lost that on
     // reconnect cache is flushed as we may have missed invalidation
@@ -240,6 +258,7 @@ void CacheImpl::onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) 
     case Operation::Set:
     case Operation::Expire:
     case Operation::Flush:
+    case Operation::Select:
     break;
     case Operation::Get:
         if (value->type() == RespType::Error || value->type() == RespType::Null) {

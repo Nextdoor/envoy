@@ -16,7 +16,8 @@ enum class Operation {
   Get,
   Set,
   Expire,
-  Flush
+  Flush,
+  Select
 };
 
 class CacheImpl : public Client::Cache, public Logger::Loggable<Logger::Id::redis>, public Client::ClientCallbacks, public Network::ConnectionCallbacks {
@@ -36,7 +37,7 @@ public:
     this->callbacks_.push_front(&callbacks);
   }
   void clearCache(bool synchronous) override;
-  void initialize(const std::string& auth_username, const std::string& auth_password, bool clear_cache) override;
+  void initialize(const std::string& auth_username, const std::string& auth_password, bool clear_cache, int db_slot) override;
 
   // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
   void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
@@ -54,6 +55,7 @@ public:
 private:
   const std::string* readRequestKey(const RespValue& request);
   const std::string* writeRequestKey(const RespValue& request);
+  void selectDatabase(int db);
 
   struct PendingCacheRequest : public Client::PoolRequest {
     PendingCacheRequest(const Operation op);
