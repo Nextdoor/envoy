@@ -224,6 +224,13 @@ public:
    * these prefixes will go to the upstream and won't be looked for in the cache.
    */
   virtual std::vector<std::string> cacheIgnoreKeyPrefixes() const PURE;
+
+  /**
+   * @return number of shards to split the cache into. This ensures that when one upstream
+   * redis node has an issue that the entire local cache is not flushed in the event that
+   * it is shared between all upstream nodes.
+   */
+  virtual uint32_t cacheShards() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -271,7 +278,7 @@ public:
   virtual void expire(const RespValue& request) PURE;
   virtual void addCallbacks(CacheCallbacks& callbacks) PURE;
   virtual void clearCache(bool synchronous) PURE;
-  virtual void initialize(const std::string& auth_username, const std::string& auth_password, bool clear_cache) PURE;
+  virtual void initialize(const std::string& auth_username, const std::string& auth_password, bool clear_cache, int db) PURE;
 };
 
 using CachePtr = std::unique_ptr<Cache>;
