@@ -111,6 +111,8 @@ private:
     unsigned int cacheShards() const override {
       return 1;
     }
+    bool cacheDisableTracking() const override { return false; }
+
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;

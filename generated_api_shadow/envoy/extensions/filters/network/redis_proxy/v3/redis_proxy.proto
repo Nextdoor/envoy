@@ -29,7 +29,7 @@ message RedisProxy {
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 17]
+  // [#next-free-field: 18]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -169,6 +169,11 @@ message RedisProxy {
     // Number of shards to split cache into. This prevents the cache from being completely
     // flushed when a single upstream host has issues and causes the cache to be flushed.
     google.protobuf.UInt32Value cache_shards = 16 [(validate.rules).uint32 = {lt: 8192 gt: 0}];
+
+    // Disables use of key tracking by upstream Redis server. When this functionality is disabled
+    // Envoy will not receive invalidation messages for keys it has accessed. This may be desirable
+    // if invalidation messages are received via an alternate mechanism.
+    bool cache_disable_tracking = 17;
   }
 
   message PrefixRoutes {

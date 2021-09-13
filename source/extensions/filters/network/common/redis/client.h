@@ -231,6 +231,15 @@ public:
    * it is shared between all upstream nodes.
    */
   virtual uint32_t cacheShards() const PURE;
+
+
+  /**
+   * @return whether to disable use of key tracking by upstream Redis server. When this
+   * functionality is disabled Envoy will not receive invalidation messages for keys it has
+   * accessed. This may be desirable if invalidation messages are received via an alternate
+   * mechanism.
+   */
+  virtual bool cacheDisableTracking() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
