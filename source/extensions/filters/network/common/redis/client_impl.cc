@@ -70,7 +70,8 @@ ConfigImpl::ConfigImpl(
       cache_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, cache_ttl, 3)),
       cache_enable_bcast_mode_(config.cache_enable_bcast_mode()),
       cache_ignore_key_prefixes_(convertKeyPrefixes(config.cache_ignore_key_prefixes())),
-      cache_shards_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_shards, 1)) {
+      cache_shards_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_shards, 1)),
+      cache_disable_tracking_(config.cache_disable_tracking()) {
   switch (config.read_policy()) {
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Primary;
@@ -459,8 +460,10 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
   // Turn on client tracking
   if (cache_) {
     cache_->addCallbacks(*this);
-    Utility::ClientTrackingRequest client_tracking_request(config_.cacheEnableBcastMode());
-    makeRequest(client_tracking_request, null_pool_callbacks);
+    if (!config_.cacheDisableTracking()) {
+      Utility::ClientTrackingRequest client_tracking_request(config_.cacheEnableBcastMode());
+      makeRequest(client_tracking_request, null_pool_callbacks);
+    }
   }
 
   // Any connection to replica requires the READONLY command in order to perform read.
