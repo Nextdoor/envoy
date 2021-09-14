@@ -240,6 +240,12 @@ public:
    * mechanism.
    */
   virtual bool cacheDisableTracking() const PURE;
+
+  /**
+   * @return whether to disable the flushing of the cache when Envoy initially connects to
+   * the cache. This could be desirable if serving of stale data is tolerable.
+   */
+  virtual bool cacheDisableFlushing() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

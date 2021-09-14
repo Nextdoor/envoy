@@ -77,6 +77,7 @@ public:
   std::vector<std::string> cacheIgnoreKeyPrefixes() const override { return cache_ignore_key_prefixes_; }
   uint32_t cacheShards() const override { return cache_shards_; }
   bool cacheDisableTracking() const override { return cache_disable_tracking_; }
+  bool cacheDisableFlushing() const override { return cache_disable_flushing_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -97,6 +98,7 @@ private:
   const std::vector<std::string> cache_ignore_key_prefixes_;
   const uint32_t cache_shards_;
   const bool cache_disable_tracking_;
+  const bool cache_disable_flushing_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public CacheCallbacks, public Network::ConnectionCallbacks, public Logger::Loggable<Logger::Id::redis> {
