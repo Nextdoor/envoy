@@ -505,7 +505,7 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
     ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
                                       decoder_factory_, *cache_config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
     cp = cache_factory_.create(std::move(cache_client), config.cacheTtl(), config.cacheIgnoreKeyPrefixes());
-    cp->initialize(auth_username, auth_password, true, shard);
+    cp->initialize(auth_username, auth_password, !config.cacheDisableTracking(), shard);
   }
 
   ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
