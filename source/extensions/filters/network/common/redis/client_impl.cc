@@ -71,7 +71,8 @@ ConfigImpl::ConfigImpl(
       cache_enable_bcast_mode_(config.cache_enable_bcast_mode()),
       cache_ignore_key_prefixes_(convertKeyPrefixes(config.cache_ignore_key_prefixes())),
       cache_shards_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_shards, 1)),
-      cache_disable_tracking_(config.cache_disable_tracking()) {
+      cache_disable_tracking_(config.cache_disable_tracking()),
+      cache_disable_flushing_(config.cache_disable_flushing()) {
   switch (config.read_policy()) {
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Primary;
@@ -502,10 +503,11 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
     // issues whith a particular host the entire cache is not flushed.
     int shard = int(HashUtil::xxHash64(host->address()->asString()) % config.cacheShards());
     auto cache_config = new ConfigImpl(createCacheConnSettings(config));
+    bool flush_cache = !(config.cacheDisableTracking() || config.cacheDisableFlushing());
     ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
                                       decoder_factory_, *cache_config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
     cp = cache_factory_.create(std::move(cache_client), config.cacheTtl(), config.cacheIgnoreKeyPrefixes());
-    cp->initialize(auth_username, auth_password, !config.cacheDisableTracking(), shard);
+    cp->initialize(auth_username, auth_password, flush_cache, shard);
   }
 
   ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
