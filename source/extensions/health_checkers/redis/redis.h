@@ -112,6 +112,7 @@ private:
       return 1;
     }
     bool cacheDisableTracking() const override { return false; }
+    bool cacheDisableFlushing() const override { return false; }
 
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks

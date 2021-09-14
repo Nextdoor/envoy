@@ -255,6 +255,7 @@ private:
     }
 
     bool cacheDisableTracking() const override { return false; }
+    bool cacheDisableFlushing() const override { return false; }
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;

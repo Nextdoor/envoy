@@ -29,7 +29,7 @@ message RedisProxy {
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 18]
+  // [#next-free-field: 19]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -174,6 +174,10 @@ message RedisProxy {
     // Envoy will not receive invalidation messages for keys it has accessed. This may be desirable
     // if invalidation messages are received via an alternate mechanism.
     bool cache_disable_tracking = 17;
+
+    // Disables the flushing of the cache when Envoy initially connects to the cache. This
+    // could be desirable if serving of stale data is tolerable.
+    bool cache_disable_flushing = 18;
   }
 
   message PrefixRoutes {
