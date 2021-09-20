@@ -116,9 +116,9 @@ Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_
 Upstream::HostConstSharedPtr returnPrimaryIfHealthy(Upstream::HostConstSharedPtr primary_host) {
   if (primary_host->health() == Upstream::Host::Health::Healthy ||
       primary_host->health() == Upstream::Host::Health::Degraded) {
-        return primary_host
+        return primary_host;
   }
-  return nullptr
+  return nullptr;
 }
 } // namespace
 
