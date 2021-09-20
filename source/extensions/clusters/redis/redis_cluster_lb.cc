@@ -106,10 +106,6 @@ Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_
     hosts = host_set.degradedHosts();
   }
 
-  if (hosts.empty()) {
-    hosts = host_set.hosts();
-  }
-
   if (!hosts.empty()) {
     return hosts[random.random() % hosts.size()];
   } else {
@@ -158,6 +154,12 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
       return chooseRandomHost(shard->allHosts(), random_);
     }
   }
+  // If the primary is not healthy, return nullptr
+  if (shard->primary()->health() != Upstream::Host::Health::Healthy ||
+      shard->primary()->health() != Upstream::Host::Health::Degraded) {
+        return nullptr
+  }
+
   return shard->primary();
 }
 
