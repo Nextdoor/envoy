@@ -112,6 +112,14 @@ Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_
     return nullptr;
   }
 }
+
+Upstream::HostConstSharedPtr returnPrimaryIfHealthy(Upstream::HostConstSharedPtr primary_host) {
+  if (primary_host->health() == Upstream::Host::Health::Healthy ||
+      primary_host->health() == Upstream::Host::Health::Degraded) {
+        return primary_host
+  }
+  return nullptr
+}
 } // namespace
 
 Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
@@ -135,10 +143,10 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
   if (redis_context && redis_context->isReadCommand()) {
     switch (redis_context->readPolicy()) {
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Primary:
-      return shard->primary();
+      return returnPrimaryIfHealthy(shard->primary());
     case NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary:
       if (shard->primary()->health() == Upstream::Host::Health::Healthy) {
-        return shard->primary();
+        return returnPrimaryIfHealthy(shard->primary());
       } else {
         return chooseRandomHost(shard->allHosts(), random_);
       }
@@ -154,13 +162,8 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
       return chooseRandomHost(shard->allHosts(), random_);
     }
   }
-  // If the primary is not healthy, return nullptr
-  if (shard->primary()->health() != Upstream::Host::Health::Healthy ||
-      shard->primary()->health() != Upstream::Host::Health::Degraded) {
-        return nullptr
-  }
 
-  return shard->primary();
+  return returnPrimaryIfHealthy(shard->primary());
 }
 
 bool RedisLoadBalancerContextImpl::isReadRequest(
