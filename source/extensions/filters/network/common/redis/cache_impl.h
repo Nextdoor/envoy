@@ -1,9 +1,9 @@
 #pragma once
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
-#include "extensions/filters/network/common/redis/codec.h"
-#include "extensions/filters/network/common/redis/client.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
+#include "source/extensions/filters/network/common/redis/client.h"
 
 
 namespace Envoy {

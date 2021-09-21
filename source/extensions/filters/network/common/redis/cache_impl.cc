@@ -1,10 +1,10 @@
-#include "extensions/filters/network/common/redis/cache_impl.h"
+#include "source/extensions/filters/network/common/redis/cache_impl.h"
 
 #include <cstddef>
 #include <string>
-#include "extensions/filters/network/common/redis/client.h"
-#include "extensions/filters/network/common/redis/codec.h"
-#include "extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/filters/network/common/redis/client.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
 
 
 namespace Envoy {

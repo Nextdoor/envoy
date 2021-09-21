@@ -12,7 +12,6 @@
 #include "source/common/common/utility.h"
 
 #include "absl/container/fixed_array.h"
-#include "extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {
 namespace Extensions {
