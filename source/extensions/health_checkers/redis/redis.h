@@ -114,6 +114,7 @@ private:
     }
     bool cacheDisableTracking() const override { return false; }
     bool cacheDisableFlushing() const override { return false; }
+    bool useUnhealthyHosts() const override { return false; }
 
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
