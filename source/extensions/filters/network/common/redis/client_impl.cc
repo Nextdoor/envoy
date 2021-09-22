@@ -72,7 +72,8 @@ ConfigImpl::ConfigImpl(
       cache_ignore_key_prefixes_(convertKeyPrefixes(config.cache_ignore_key_prefixes())),
       cache_shards_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_shards, 1)),
       cache_disable_tracking_(config.cache_disable_tracking()),
-      cache_disable_flushing_(config.cache_disable_flushing()) {
+      cache_disable_flushing_(config.cache_disable_flushing()),
+      use_unhealthy_hosts_(config.use_unhealthy_hosts()) {
   switch (config.read_policy()) {
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Primary;

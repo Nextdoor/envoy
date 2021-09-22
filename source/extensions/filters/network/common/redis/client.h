@@ -246,6 +246,11 @@ public:
    * the cache. This could be desirable if serving of stale data is tolerable.
    */
   virtual bool cacheDisableFlushing() const PURE;
+
+  /**
+   * @return when enabled, redis proxy would use unhealthy hosts to read/write data.
+   */
+  virtual bool useUnhealthyHosts() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
