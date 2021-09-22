@@ -272,7 +272,8 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
 
   Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, config_->enableHashtagging(),
                                                            is_redis_cluster_, getRequest(request),
-                                                           config_->readPolicy());
+                                                           config_->readPolicy(),
+                                                           config_->useUnhealthyHosts());
   ENVOY_LOG(trace, "use unhealthy hosts?: '{}'", config_->useUnhealthyHosts());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {

@@ -183,10 +183,11 @@ bool RedisLoadBalancerContextImpl::isReadRequest(
 RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(
     const std::string& key, bool enabled_hashtagging, bool is_redis_cluster,
     const NetworkFilters::Common::Redis::RespValue& request,
-    NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
+    NetworkFilters::Common::Redis::Client::ReadPolicy read_policy,
+    bool use_unhealthy_hosts)
     : hash_key_(is_redis_cluster ? Crc16::crc16(hashtag(key, true))
                                  : MurmurHash::murmurHash2(hashtag(key, enabled_hashtagging))),
-      is_read_(isReadRequest(request)), read_policy_(read_policy) {}
+      is_read_(isReadRequest(request)), read_policy_(read_policy), use_unhealthy_hosts_(use_unhealthy_hosts) {}
 
 // Inspired by the redis-cluster hashtagging algorithm
 // https://redis.io/topics/cluster-spec#keys-hash-tags
