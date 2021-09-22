@@ -100,10 +100,16 @@ Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create() {
 
 namespace {
 Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_set,
-                                              Random::RandomGenerator& random) {
+                                              Random::RandomGenerator& random,
+                                              const bool use_unhealthy_hosts) {
   auto hosts = host_set.healthyHosts();
   if (hosts.empty()) {
     hosts = host_set.degradedHosts();
+  }
+
+  // select all host if the hosts are no healthy or degraded hosts and use_unhealthy_hosts is enabled
+  if (hosts.empty() && use_unhealthy_hosts) {
+    hosts = host_set.hosts();
   }
 
   if (!hosts.empty()) {
@@ -148,18 +154,18 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
       if (shard->primary()->health() == Upstream::Host::Health::Healthy) {
         return returnPrimaryIfHealthy(shard->primary());
       } else {
-        return chooseRandomHost(shard->allHosts(), random_);
+        return chooseRandomHost(shard->allHosts(), random_, redis_context->useUnhealthyHosts());
       }
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Replica:
-      return chooseRandomHost(shard->replicas(), random_);
+      return chooseRandomHost(shard->replicas(), random_, redis_context->useUnhealthyHosts());
     case NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica:
       if (!shard->replicas().healthyHosts().empty()) {
-        return chooseRandomHost(shard->replicas(), random_);
+        return chooseRandomHost(shard->replicas(), random_, redis_context->useUnhealthyHosts());
       } else {
-        return chooseRandomHost(shard->allHosts(), random_);
+        return chooseRandomHost(shard->allHosts(), random_, redis_context->useUnhealthyHosts());
       }
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Any:
-      return chooseRandomHost(shard->allHosts(), random_);
+      return chooseRandomHost(shard->allHosts(), random_, redis_context->useUnhealthyHosts());
     }
   }
 
