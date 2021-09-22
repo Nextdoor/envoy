@@ -78,6 +78,7 @@ public:
   uint32_t cacheShards() const override { return cache_shards_; }
   bool cacheDisableTracking() const override { return cache_disable_tracking_; }
   bool cacheDisableFlushing() const override { return cache_disable_flushing_; }
+  bool useUnhealthyHosts() const override { return use_unhealthy_hosts_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -99,6 +100,7 @@ private:
   const uint32_t cache_shards_;
   const bool cache_disable_tracking_;
   const bool cache_disable_flushing_;
+  const bool use_unhealthy_hosts_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public CacheCallbacks, public Network::ConnectionCallbacks, public Logger::Loggable<Logger::Id::redis> {
