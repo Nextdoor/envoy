@@ -58,6 +58,7 @@ public:
 
   virtual bool isReadCommand() const PURE;
   virtual NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const PURE;
+  virtual bool useUnhealthyHosts() const PURE;
 };
 
 class RedisLoadBalancerContextImpl : public RedisLoadBalancerContext,
@@ -73,12 +74,14 @@ public:
    * will be hashed using crc16.
    * @param request specify the Redis request.
    * @param read_policy specify the read policy.
+   * @param use_unhealthy_hosts specify whether to use unhealthy host to read and write data
    */
   RedisLoadBalancerContextImpl(const std::string& key, bool enabled_hashtagging,
                                bool is_redis_cluster,
                                const NetworkFilters::Common::Redis::RespValue& request,
                                NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
-                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
+                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Primary,
+                               bool use_unhealthy_hosts = true);
 
   // Upstream::LoadBalancerContextBase
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
@@ -89,6 +92,8 @@ public:
     return read_policy_;
   }
 
+  bool useUnhealthyHosts() const override { return use_unhealthy_hosts_; }
+
 private:
   absl::string_view hashtag(absl::string_view v, bool enabled);
 
@@ -97,6 +102,7 @@ private:
   const absl::optional<uint64_t> hash_key_;
   const bool is_read_;
   const NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_;
+  const bool use_unhealthy_hosts_;
 };
 
 class ClusterSlotUpdateCallBack {
