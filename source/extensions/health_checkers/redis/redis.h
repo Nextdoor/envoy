@@ -114,8 +114,6 @@ private:
     }
     bool cacheDisableTracking() const override { return false; }
     bool cacheDisableFlushing() const override { return false; }
-    // retrun true to keep existing behavior - this is not getting use at the moment.
-    bool useUnhealthyHosts() const override { return true; }
 
 
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
