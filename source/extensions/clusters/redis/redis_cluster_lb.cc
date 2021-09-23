@@ -100,15 +100,13 @@ Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create() {
 
 namespace {
 Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_set,
-                                              Random::RandomGenerator& random,
-                                              const bool use_unhealthy_hosts) {
+                                              Random::RandomGenerator& random) {
   auto hosts = host_set.healthyHosts();
   if (hosts.empty()) {
     hosts = host_set.degradedHosts();
   }
 
-  // select all host if the hosts are no healthy or degraded hosts and use_unhealthy_hosts is enabled
-  if (hosts.empty() && use_unhealthy_hosts) {
+  if (hosts.empty()) {
     hosts = host_set.hosts();
   }
 
@@ -117,18 +115,6 @@ Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_
   } else {
     return nullptr;
   }
-}
-
-Upstream::HostConstSharedPtr returnPrimary(Upstream::HostConstSharedPtr primary_host,
-                                                    const bool use_unhealthy_hosts) {
-  if (use_unhealthy_hosts) {
-    return primary_host;
-  } else if (
-    primary_host->health() == Upstream::Host::Health::Healthy ||
-    primary_host->health() == Upstream::Host::Health::Degraded) {
-        return primary_host;
-  }
-  return nullptr;
 }
 } // namespace
 
@@ -153,27 +139,26 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
   if (redis_context && redis_context->isReadCommand()) {
     switch (redis_context->readPolicy()) {
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Primary:
-      return returnPrimary(shard->primary(), redis_context->useUnhealthyHosts());
+      return shard->primary();
     case NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary:
       if (shard->primary()->health() == Upstream::Host::Health::Healthy) {
-        return returnPrimary(shard->primary(), redis_context->useUnhealthyHosts());
+        return shard->primary();
       } else {
-        return chooseRandomHost(shard->allHosts(), random_, redis_context->useUnhealthyHosts());
+        return chooseRandomHost(shard->allHosts(), random_);
       }
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Replica:
-      return chooseRandomHost(shard->replicas(), random_, redis_context->useUnhealthyHosts());
+      return chooseRandomHost(shard->replicas(), random_);
     case NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica:
       if (!shard->replicas().healthyHosts().empty()) {
-        return chooseRandomHost(shard->replicas(), random_, redis_context->useUnhealthyHosts());
+        return chooseRandomHost(shard->replicas(), random_);
       } else {
-        return chooseRandomHost(shard->allHosts(), random_, redis_context->useUnhealthyHosts());
+        return chooseRandomHost(shard->allHosts(), random_);
       }
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Any:
-      return chooseRandomHost(shard->allHosts(), random_, redis_context->useUnhealthyHosts());
+      return chooseRandomHost(shard->allHosts(), random_);
     }
   }
-
-  return returnPrimary(shard->primary(), redis_context->useUnhealthyHosts());
+  return shard->primary();
 }
 
 bool RedisLoadBalancerContextImpl::isReadRequest(
@@ -198,11 +183,10 @@ bool RedisLoadBalancerContextImpl::isReadRequest(
 RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(
     const std::string& key, bool enabled_hashtagging, bool is_redis_cluster,
     const NetworkFilters::Common::Redis::RespValue& request,
-    NetworkFilters::Common::Redis::Client::ReadPolicy read_policy,
-    bool use_unhealthy_hosts)
+    NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
     : hash_key_(is_redis_cluster ? Crc16::crc16(hashtag(key, true))
                                  : MurmurHash::murmurHash2(hashtag(key, enabled_hashtagging))),
-      is_read_(isReadRequest(request)), read_policy_(read_policy), use_unhealthy_hosts_(use_unhealthy_hosts) {}
+      is_read_(isReadRequest(request)), read_policy_(read_policy) {}
 
 // Inspired by the redis-cluster hashtagging algorithm
 // https://redis.io/topics/cluster-spec#keys-hash-tags
