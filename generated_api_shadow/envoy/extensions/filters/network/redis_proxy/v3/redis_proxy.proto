@@ -29,7 +29,7 @@ message RedisProxy {
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 19]
+  // [#next-free-field: 20]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -178,6 +178,9 @@ message RedisProxy {
     // Disables the flushing of the cache when Envoy initially connects to the cache. This
     // could be desirable if serving of stale data is tolerable.
     bool cache_disable_flushing = 18;
+
+    // Enable/Disable use of unhealthy hosts
+    bool use_unhealthy_hosts = 19;
   }
 
   message PrefixRoutes {
