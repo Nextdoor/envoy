@@ -102,14 +102,17 @@ private:
 
 class ClientImpl : public Client, public DecoderCallbacks, public CacheCallbacks, public Network::ConnectionCallbacks, public Logger::Loggable<Logger::Id::redis> {
 public:
-  static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                          EncoderPtr&& encoder, DecoderFactory& decoder_factory,
+  static ClientPtr create(const RespVersion resp_version,
+                          Upstream::HostConstSharedPtr host,
+                          Event::Dispatcher& dispatcher,
+                          EncoderPtr&& encoder,
+                          DecoderFactory& decoder_factory,
                           const Config& config,
                           const RedisCommandStatsSharedPtr& redis_command_stats,
                           Stats::Scope& scope,
                           CachePtr&& cache);
 
-  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+  ClientImpl(const RespVersion resp_version, Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const Config& config,
              const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope, CachePtr&& cache);
   ~ClientImpl() override;
@@ -173,6 +176,7 @@ private:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
+  RespVersion resp_version_;
   Upstream::HostConstSharedPtr host_;
   Network::ClientConnectionPtr connection_;
   EncoderPtr encoder_;

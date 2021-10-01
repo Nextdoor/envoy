@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/common/redis/utility.h"
 
+#include "codec.h"
 #include "source/common/common/utility.h"
 
 namespace Envoy {
@@ -31,12 +32,24 @@ AuthRequest::AuthRequest(const std::string& username, const std::string& passwor
   asArray().swap(values);
 }
 
-HelloRequest::HelloRequest() {
+HelloRequest::HelloRequest(const RespVersion resp_version) {
   std::vector<RespValue> values(2);
   values[0].type(RespType::BulkString);
   values[0].asString() = "hello";
   values[1].type(RespType::BulkString);
-  values[1].asString() = "3";
+
+  switch (resp_version) {
+    case RespVersion::Resp2:
+      values[1].asString() = "2";
+      break;
+    case RespVersion::Resp3:
+      values[1].asString() = "3";
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+      break;
+  }
+
   type(RespType::Array);
   asArray().swap(values);
 }

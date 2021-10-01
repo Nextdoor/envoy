@@ -19,7 +19,7 @@ public:
 
 class HelloRequest : public Redis::RespValue {
 public:
-  HelloRequest();
+  HelloRequest(const RespVersion resp_version);
 };
 
 class ClientTrackingRequest : public Redis::RespValue {
