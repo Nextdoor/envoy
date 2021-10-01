@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 
+#include "codec.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 namespace Envoy {
@@ -80,13 +81,13 @@ ConfigImpl::ConfigImpl(
   }
 }
 
-ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+ClientPtr ClientImpl::create(const RespVersion resp_version, Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const Config& config,
                              const RedisCommandStatsSharedPtr& redis_command_stats,
                              Stats::Scope& scope,
                              CachePtr&& cache) {
-  auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory,
+  auto client = std::make_unique<ClientImpl>(resp_version, host, dispatcher, std::move(encoder), decoder_factory,
                                              config, redis_command_stats, scope, std::move(cache));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
@@ -96,11 +97,11 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
   return client;
 }
 
-ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+ClientImpl::ClientImpl(const RespVersion resp_version, Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config,
                        const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                        CachePtr&& cache)
-    : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
+    : resp_version_(resp_version), host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
@@ -437,8 +438,10 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
     makeRequest(auth_request, null_pool_callbacks);
   }
 
-  // Send a HELLO command to set client server protocol version.
-  Utility::HelloRequest hello_request;
+  // Client HELLO is only supported by Redis server 6.0 and up but we always send
+  // it just in case becasue we don't know what server version we're communicating
+  // with.
+  Utility::HelloRequest hello_request(resp_version_);
   makeRequest(hello_request, null_pool_callbacks);
 
   // Turn on client tracking
@@ -481,19 +484,23 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     const std::string& auth_password,
                                     Upstream::HostConstSharedPtr cache_host) {
   CachePtr cp = nullptr;
+  RespVersion resp_version = RespVersion::Resp2;
   if (cache_host != nullptr) {
     // Use the hash of the host as the cache database. This ensures that when there are connectivity
     // issues whith a particular host the entire cache is not flushed.
     int shard = int(HashUtil::xxHash64(host->address()->asString()) % config.cacheShards());
     auto cache_config = new ConfigImpl(createCacheConnSettings(config));
     bool flush_cache = !(config.cacheDisableTracking() || config.cacheDisableFlushing());
-    ClientPtr cache_client = ClientImpl::create(cache_host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
+    ClientPtr cache_client = ClientImpl::create(RespVersion::Resp3, cache_host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
                                       decoder_factory_, *cache_config, redis_command_stats, cache_host->cluster().statsScope(), nullptr);
     cp = cache_factory_.create(std::move(cache_client), config.cacheTtl(), config.cacheIgnoreKeyPrefixes());
     cp->initialize(auth_username, auth_password, flush_cache, shard);
+
+    // CSC requires RESP3
+    resp_version = RespVersion::Resp3;
   }
 
-  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl(RespVersion::Resp3)},
+  ClientPtr client = ClientImpl::create(resp_version, host, dispatcher, EncoderPtr{new EncoderImpl(resp_version)},
                                         decoder_factory_, config, redis_command_stats, scope, std::move(cp));
 
   client->initialize(auth_username, auth_password);
