@@ -90,9 +90,9 @@ py==1.10.0 \
     # via
     #   -r tools/testing/requirements.txt
     #   pytest
-pyparsing==2.4.7 \
-    --hash=sha256:c203ec8783bf771a155b207279b9bccb8dea02d8f0c9e5f8ead507bc3246ecc1 \
-    --hash=sha256:ef9d7589ef3c200abe66653d3f1ab1033c3c419ae9b9bdb1240a85b024efc88b
+pyparsing==3.0.3 \
+    --hash=sha256:f8d3fe9fc404576c5164f0f0c4e382c96b85265e023c409c43d48f65da9d60d0 \
+    --hash=sha256:9e3511118010f112a4b4b435ae50e1eaa610cda191acb9e421d60cf5fde83455
     # via
     #   -r tools/testing/requirements.txt
     #   packaging
