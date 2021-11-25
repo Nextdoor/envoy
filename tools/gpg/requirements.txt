@@ -4,7 +4,7 @@
 #
 #    pip-compile --generate-hashes tools/gpg/requirements.txt
 #
-python-gnupg==0.4.7 \
-    --hash=sha256:2061f56b1942c29b92727bf9aecbd3cea3893acc9cccbdc7eb4604285efe4ac7 \
-    --hash=sha256:3ff5b1bf5e397de6e1fe41a7c0f403dad4e242ac92b345f440eaecfb72a7ebae
+python-gnupg==0.4.8 \
+    --hash=sha256:93a521501d6c2785d96b190aec7125ba89c1c2fe708b0c98af3fb32b59026ab8 \
+    --hash=sha256:b64de1ae5cedf872b437201a566fa2c62ce0c95ea2e30177eb53aee1258507d7
     # via -r tools/gpg/requirements.txt
