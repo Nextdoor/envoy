@@ -96,9 +96,9 @@ pyparsing==2.4.7 \
     # via
     #   -r tools/testing/requirements.txt
     #   packaging
-pytest-asyncio==0.15.1 \
-    --hash=sha256:2564ceb9612bbd560d19ca4b41347b54e7835c2f792c504f698e05395ed63f6f \
-    --hash=sha256:3042bcdf1c5d978f6b74d96a151c4cfb9dcece65006198389ccd7e6c60eb1eea
+pytest-asyncio==0.17.0 \
+    --hash=sha256:b41c3ff0ec5b5b144459aa1c53a866f67278177f6d4f3ef6874bd864fc82834d \
+    --hash=sha256:c98e0e04ae5910bbcc219f52bdf871bd1d392f624ef77c49c236613c0b6d8ee1
     # via -r tools/testing/requirements.txt
 pytest-cov==2.12.1 \
     --hash=sha256:261bb9e47e65bd099c89c3edf92972865210c36813f80ede5277dceb77a4a62a \
