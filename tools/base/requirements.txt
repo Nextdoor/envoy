@@ -59,7 +59,7 @@ verboselogs==1.7 \
     # via -r tools/base/requirements.txt
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==57.4.0 \
-    --hash=sha256:6bac238ffdf24e8806c61440e755192470352850f3419a52f26ffe0a1a64f465 \
-    --hash=sha256:a49230977aa6cfb9d933614d2f7b79036e9945c4cdd7583163f4e920b83418d6
+setuptools==60.9.2 \
+    --hash=sha256:80743e57120665fa65665286369a0734bce0e7a629ad36507fb7a4b65e7d2e3b \
+    --hash=sha256:93b1a3037230bf9aa07327b9fc58f527d5f4e22d36705b55d55ba3ece8606ca6
     # via -r tools/base/requirements.txt
