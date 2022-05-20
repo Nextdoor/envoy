@@ -4,9 +4,9 @@
 #
 #    pip-compile --generate-hashes .github/actions/pr_notifier/requirements.txt
 #
-certifi==2021.5.30 \
-    --hash=sha256:2bbf76fd432960138b3ef6dda3dde0544f27cbf8546c458e60baf371917ba9ee \
-    --hash=sha256:50b1e4f8446b06f41be7dd6338db18e0990601dce795c2b1686458aa7e8fa7d8
+certifi==2022.5.18.1 \
+    --hash=sha256:9c5705e395cd70084351dd8ad5c41e65655e08ce46f2ec9cf6c2c08390f71eb7 \
+    --hash=sha256:f1d53542ee8cbedbe2118b5686372fb33c297fcd6379b050cca0ef13a597382a
     # via requests
 cffi==1.14.5 \
     --hash=sha256:005a36f41773e148deac64b08f233873a4d0c18b053d37da83f6af4d9087b813 \
