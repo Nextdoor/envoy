@@ -8,9 +8,9 @@ flake8-polyfill==1.0.2 \
     --hash=sha256:12be6a34ee3ab795b19ca73505e7b55826d5f6ad7230d31b18e106400169b9e9 \
     --hash=sha256:e44b087597f6da52ec6393a709e7108b2905317d0c0b744cdca6208e670d8eda
     # via pep8-naming
-flake8==3.9.2 \
-    --hash=sha256:07528381786f2a6237b061f6e96610a4167b226cb926e2aa2b6b1d78057c576b \
-    --hash=sha256:bf8fd333346d844f616e8d47905ef3a3384edae6b4e9beb0c5101e25e3110907
+flake8==5.0.1 \
+    --hash=sha256:44e3ecd719bba1cb2ae65d1b54212cc9df4f5db15ac271f8856e5e6c2eebefed \
+    --hash=sha256:9c51d3d1426379fd444d3b79eabbeb887849368bd053039066439523d8486961
     # via
     #   -r tools/code_format/requirements.txt
     #   flake8-polyfill
