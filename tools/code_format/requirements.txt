@@ -22,9 +22,9 @@ pep8-naming==0.11.1 \
     --hash=sha256:a1dd47dd243adfe8a83616e27cf03164960b507530f155db94e10b36a6cd6724 \
     --hash=sha256:f43bfe3eea7e0d73e8b5d07d6407ab47f2476ccaeff6937c84275cd30b016738
     # via -r tools/code_format/requirements.txt
-pycodestyle==2.7.0 \
-    --hash=sha256:514f76d918fcc0b55c6680472f0a37970994e07bbb80725808c17089be302068 \
-    --hash=sha256:c389c1d06bf7904078ca03399a4816f974a1d590090fecea0c63ec26ebaf1cef
+pycodestyle==2.9.1 \
+    --hash=sha256:2c9607871d58c76354b697b42f5d57e1ada7d261c261efac224b664affdc5785 \
+    --hash=sha256:d1735fc58b418fd7c5f658d28d943854f8a849b01a5d0a1e6f3f3fdd0166804b
     # via flake8
 pyflakes==2.3.1 \
     --hash=sha256:7893783d01b8a89811dd72d7dfd4d84ff098e5eed95cfa8905b22bbffe52efc3 \
