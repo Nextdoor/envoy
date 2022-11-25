@@ -61,9 +61,9 @@ deprecated==1.2.12 \
     # via
     #   -r tools/deprecate_version/requirements.txt
     #   pygithub
-gitdb==4.0.7 \
-    --hash=sha256:6c4cc71933456991da20917998acbe6cf4fb41eeaab7d6d67fbc05ecd4c865b0 \
-    --hash=sha256:96bf5c08b157a666fec41129e6d327235284cca4c81e92109260f353ba138005
+gitdb==4.0.10 \
+    --hash=sha256:6eb990b69df4e15bad899ea868dc46572c3f75339735663b81de79b06f17eb9a \
+    --hash=sha256:c286cf298426064079ed96a9e4a9d39e7f3e9bf15ba60701e95f5492f28415c7
     # via
     #   -r tools/deprecate_version/requirements.txt
     #   gitpython
