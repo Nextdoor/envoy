@@ -104,10 +104,9 @@ multidict==5.1.0 \
     # via
     #   aiohttp
     #   yarl
-typing-extensions==3.10.0.0 \
-    --hash=sha256:0ac0f89795dd19de6b97debb0c6af1c70987fd80a2d62d1958f7e56fcc31b497 \
-    --hash=sha256:50b6f157849174217d0656f99dc82fe932884fb250826c18350e159ec6cdf342 \
-    --hash=sha256:779383f6086d90c99ae41cf0ff39aac8a7937a9283ce0a414e5dd782f4c94a84
+typing-extensions==4.6.1 \
+    --hash=sha256:558bc0c4145f01e6405f4a5fdbd82050bd221b119f4bf72a961a1cfd471349d6 \
+    --hash=sha256:6bac751f4789b135c43228e72de18637e9a6c29d12777023a703fd1a6858469f
     # via
     #   aiodocker
     #   aiohttp
